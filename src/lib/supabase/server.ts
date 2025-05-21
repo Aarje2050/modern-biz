@@ -15,10 +15,20 @@ export const createClient = async () => {
           return cookieStore.get(name)?.value
         },
         set(name, value, options) {
-          cookieStore.set({ name, value, ...options })
+          try {
+            cookieStore.set(name, value, options)
+          } catch (error) {
+            // Handle or log any errors that occur during cookie setting
+            console.error('Error setting cookie:', error)
+          }
         },
         remove(name, options) {
-          cookieStore.set({ name, value: '', ...options })
+          try {
+            cookieStore.set(name, '', { ...options, maxAge: 0 })
+          } catch (error) {
+            // Handle or log any errors that occur during cookie removal
+            console.error('Error removing cookie:', error)
+          }
         },
       },
     }

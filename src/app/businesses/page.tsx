@@ -1,4 +1,4 @@
-// src/app/businesses/page.tsx
+// src/app/businesses/page.tsx (modified version)
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import BusinessCard from '@/components/businesses/business-card'
@@ -25,6 +25,18 @@ export const metadata = {
 
 type SortOption = 'name_asc' | 'name_desc' | 'newest' | 'oldest'
 
+type BusinessWithLocation = {
+  id: string
+  name: string
+  slug: string
+  short_description: string | null
+  logo_url: string | null
+  city?: string
+  state?: string
+  isSaved?: boolean
+  savedId?: string | null
+}
+
 export default async function BusinessesPage({
   searchParams
 }: {
@@ -34,6 +46,9 @@ export default async function BusinessesPage({
   const currentPage = searchParams.page ? parseInt(searchParams.page, 10) : 1
   const sortOption = searchParams.sort || 'name_asc'
   const categorySlug = searchParams.category
+  
+  // Check if user is authenticated
+  const { data: { session } } = await supabase.auth.getSession()
   
   // Get category if filter is applied
   let categoryFilter = null
@@ -99,8 +114,8 @@ export default async function BusinessesPage({
   // Calculate total pages
   const totalPages = Math.ceil((totalBusinesses || 0) / PAGE_SIZE)
   
-  // Enhance results with location information
-  const enhancedBusinesses = await Promise.all((businesses || []).map(async (business) => {
+  // Enhance results with location information and saved status
+  const enhancedBusinesses: BusinessWithLocation[] = await Promise.all((businesses || []).map(async (business) => {
     // Get primary location for each business
     const { data: location } = await supabase
       .from('locations')
@@ -110,10 +125,28 @@ export default async function BusinessesPage({
       .limit(1)
       .maybeSingle()
     
+    // Check if business is saved by current user (if logged in)
+    let isSaved = false
+    let savedId = null
+    
+    if (session) {
+      const { data: savedBusiness } = await supabase
+        .from('core.saved_businesses')
+        .select('id')
+        .eq('profile_id', session.user.id)
+        .eq('business_id', business.id)
+        .maybeSingle()
+      
+      isSaved = !!savedBusiness
+      savedId = savedBusiness?.id
+    }
+    
     return {
       ...business,
       city: location?.city || undefined,
-      state: location?.state || undefined
+      state: location?.state || undefined,
+      isSaved,
+      savedId
     }
   }))
   
@@ -140,7 +173,12 @@ export default async function BusinessesPage({
       {enhancedBusinesses && enhancedBusinesses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {enhancedBusinesses.map(business => (
-            <BusinessCard key={business.id} business={business} />
+            <BusinessCard 
+              key={business.id} 
+              business={business} 
+              isSaved={business.isSaved} 
+              savedId={business.savedId} 
+            />
           ))}
         </div>
       ) : (

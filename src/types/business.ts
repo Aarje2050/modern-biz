@@ -43,3 +43,4 @@ export type BusinessContact = {
     locations: Location[]
     business_contacts: BusinessContact[]
   }
+

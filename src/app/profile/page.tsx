@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import ProfileForm from '@/components/profile/profile-form'
+import SignOutButton from '@/components/auth/sign-out-button'
 
 export const metadata = {
   title: 'My Profile - Business Directory',
@@ -124,19 +125,7 @@ export default async function ProfilePage() {
                 </svg>
                 Saved Businesses
               </Link>
-              <button
-                type="button"
-                onClick={async () => {
-                  await supabase.auth.signOut()
-                  window.location.href = '/'
-                }}
-                className="w-full flex items-center text-gray-700 hover:text-gray-900 p-2 rounded-md hover:bg-gray-50"
-              >
-                <svg className="h-5 w-5 mr-3 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Sign Out
-              </button>
+              <SignOutButton />
             </nav>
           </div>
         </div>
@@ -241,7 +230,7 @@ export default async function ProfilePage() {
             )}
           </div>
           
-          {/* User's Reviews */}
+          {/* User's Reviews - Uncomment this when ready to implement reviews */}
           {/* {reviews && reviews.length > 0 && (
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="text-lg font-medium mb-4">My Reviews</h3>
