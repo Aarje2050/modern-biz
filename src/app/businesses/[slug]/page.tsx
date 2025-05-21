@@ -7,6 +7,8 @@ import { formatDate } from '@/lib/utils/formatting'
 import ReviewForm from '@/components/reviews/review-form'
 import { ShareButton, ReportButton } from '@/components/businesses/action-buttons'
 import dynamic from 'next/dynamic';
+import BusinessAssistant from '@/components/chat/business-assistant'
+import { Business } from '@/types/business'
 
 const ReviewList = dynamic(() => import('@/components/reviews/review-list'), {
   loading: () => <p>Loading reviews...</p>
@@ -111,6 +113,41 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
     
     isSaved = !!savedBusiness
     savedId = savedBusiness?.id
+  }
+
+  // Define proper types for contacts and categories
+  type BusinessContact = {
+    type: string;
+    value: string;
+  }
+  
+  type Category = {
+    name: string;
+  }
+
+  // Transform business data with proper typing
+  const businessData = {
+    id: business.id as string,
+    name: business.name as string,
+    description: business.description as string | undefined,
+    short_description: business.short_description as string | undefined,
+    // Map categories with proper typing
+    categories: Array.isArray(business.categories) 
+      ? business.categories.map((c: Category) => c.name) 
+      : [],
+    // Transform locations with proper typing
+    locations: locations ? locations.map(loc => ({
+      address_line1: loc.address_line1 as string,
+      city: loc.city as string,
+      state: loc.state as string
+    })) : undefined,
+    // Map business contacts with proper typing
+    business_contacts: contacts 
+      ? contacts.map((c: BusinessContact) => ({ 
+          type: c.type, 
+          value: c.value 
+        })) 
+      : undefined
   }
 
  // src/app/businesses/[slug]/page.tsx
@@ -551,6 +588,8 @@ return (
         </div>
       </div>
     </div>
+  {/* AI Chat Assistant */}
+  <BusinessAssistant business={businessData} />
   </div>
 )
 }
