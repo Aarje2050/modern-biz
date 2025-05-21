@@ -31,3 +31,17 @@
     @apply bg-white text-gray-900 border border-gray-300 hover:bg-gray-100 focus-visible:ring-gray-500;
   }
 }
+
+
+@keyframes loadingBar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-loading-bar {
+  animation: loadingBar 1.5s infinite;
+}

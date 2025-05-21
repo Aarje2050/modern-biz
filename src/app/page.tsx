@@ -16,6 +16,8 @@ export const metadata = {
   }
 }
 
+export const revalidate = 300;
+
 export default async function Home() {
   const supabase = await createClient()
   

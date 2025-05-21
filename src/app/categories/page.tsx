@@ -8,6 +8,7 @@ export const metadata = {
   description: 'Browse businesses by category in our directory',
 }
 
+export const revalidate = 3600;
 export default async function CategoriesPage() {
   const supabase = await createClient()
   

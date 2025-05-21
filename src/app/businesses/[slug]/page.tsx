@@ -4,9 +4,13 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils/formatting'
-import ReviewList from '@/components/reviews/review-list'
 import ReviewForm from '@/components/reviews/review-form'
 import { ShareButton, ReportButton } from '@/components/businesses/action-buttons'
+import dynamic from 'next/dynamic';
+
+const ReviewList = dynamic(() => import('@/components/reviews/review-list'), {
+  loading: () => <p>Loading reviews...</p>
+});
 
 
 // Add metadata for SEO
@@ -37,7 +41,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     }
   }
 }
-
+export const revalidate = 300; 
 export default async function BusinessDetailPage({ params }: { params: { slug: string } }) {
   const supabase = await createClient()
   

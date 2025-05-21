@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     description: category.description || `Browse ${category.name} businesses in our directory`,
   }
 }
-
+export const revalidate = 600;
 export default async function CategoryPage({ 
   params,
   searchParams

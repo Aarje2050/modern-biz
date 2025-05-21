@@ -16,17 +16,17 @@ export default function Footer() {
             <h3 className="text-lg font-semibold mb-4">Explore</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/businesses" className="text-gray-600 hover:text-primary-600">
+                <Link href="/businesses" prefetch={true} className="text-gray-600 hover:text-primary-600">
                   Businesses
                 </Link>
               </li>
               <li>
-                <Link href="/categories" className="text-gray-600 hover:text-primary-600">
+                <Link href="/categories" prefetch={true} className="text-gray-600 hover:text-primary-600">
                   Categories
                 </Link>
               </li>
               <li>
-                <Link href="/search" className="text-gray-600 hover:text-primary-600">
+                <Link href="/search" prefetch={true} className="text-gray-600 hover:text-primary-600">
                   Search
                 </Link>
               </li>

@@ -6,6 +6,8 @@ import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
 import AuthProvider from '@/providers/auth-provider'
 
+
+
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
@@ -22,6 +24,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
+        
           <div className="flex flex-col min-h-screen">
             <Header />
             <main className="flex-grow">{children}</main>
