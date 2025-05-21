@@ -8,7 +8,8 @@ import ReviewForm from '@/components/reviews/review-form'
 import { ShareButton, ReportButton } from '@/components/businesses/action-buttons'
 import dynamic from 'next/dynamic';
 import BusinessAssistant from '@/components/chat/business-assistant'
-import { Business } from '@/types/business'
+import BusinessTrackingScript from '@/components/analytics/business-tracking-script'
+
 
 const ReviewList = dynamic(() => import('@/components/reviews/review-list'), {
   loading: () => <p>Loading reviews...</p>
@@ -590,6 +591,8 @@ return (
     </div>
   {/* AI Chat Assistant */}
   <BusinessAssistant business={businessData} />
+  {/* Include tracking script */}
+  <BusinessTrackingScript businessId={business.id} />
   </div>
 )
 }
