@@ -1,13 +1,19 @@
-// src/components/businesses/action-buttons.tsx
+// src/components/businesses/action-buttons.tsx (UPDATE EXISTING)
 'use client'
 
 import { useState } from 'react'
+import { track } from '@/lib/analytics'
 
-export function ShareButton() {
+interface ActionButtonsProps {
+  businessId: string
+}
+
+export function ShareButton({ businessId }: ActionButtonsProps) {
   const [shared, setShared] = useState(false)
   
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href)
+    track.businessAction(businessId, 'share') // Add tracking
     setShared(true)
     setTimeout(() => setShared(false), 2000)
   }
@@ -26,9 +32,9 @@ export function ShareButton() {
   )
 }
 
-export function ReportButton() {
+export function ReportButton({ businessId }: ActionButtonsProps) {
   const handleReport = () => {
-    // This could open a modal or navigate to a report page
+    track.businessAction(businessId, 'report') // Add tracking
     alert('Thank you for reporting this listing. Our team will review it shortly.')
   }
   

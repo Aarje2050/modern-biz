@@ -52,9 +52,16 @@ interface Business {
   avgRating: number;
 }
 
+// Update this interface (around line 60-65)
 interface SearchTerm {
   term: string;
   count: number;
+  avgResultCount?: number;
+  firstSearched?: string;
+  lastSearched?: string;
+  isRecent?: boolean;
+  isPopular?: boolean;
+  searches?: Array<{ date: string; resultCount: number }>;
 }
 
 interface BusinessInteraction {
