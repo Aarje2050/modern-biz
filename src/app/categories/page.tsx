@@ -18,24 +18,28 @@ export default async function CategoriesPage() {
     .select('*')
     .order('name')
   
-  // Get business count for each category
-  const categoriesWithCount = await Promise.all((categories || []).map(async (category) => {
-    const { count } = await supabase
-      .from('business_categories')
-      .select('*', { count: 'exact', head: true })
-      .eq('category_id', category.id)
-      .filter('business_id', 'in', 
-        supabase
-          .from('businesses')
-          .select('id')
-          .eq('status', 'active')
-      )
-      
-    return {
-      ...category,
-      businessCount: count || 0
-    }
-  }))
+  // Get all active business IDs
+const { data: activeBusinesses } = await supabase
+.from('businesses')
+.select('id')
+.eq('status', 'active');
+
+const activeBusinessIds = (activeBusinesses || []).map(b => b.id);
+
+// Now get count of businesses per category
+const categoriesWithCount = await Promise.all((categories || []).map(async (category) => {
+const { count } = await supabase
+  .from('business_categories')
+  .select('*', { count: 'exact', head: true })
+  .eq('category_id', category.id)
+  .in('business_id', activeBusinessIds);
+
+return {
+  ...category,
+  businessCount: count || 0
+}
+}));
+
   
   return (
     <div className="container mx-auto px-4 py-8">

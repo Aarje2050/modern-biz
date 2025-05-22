@@ -156,6 +156,11 @@ export default async function DashboardPage() {
                   </Link>
                 </li>
                 <li className="py-3">
+                  <Link href="/dashboard/analytics" className="text-sm font-medium text-gray-600 hover:text-gray-900">
+                    Analytics
+                  </Link>
+                </li>
+                <li className="py-3">
                   <Link href="/profile" className="text-sm font-medium text-gray-600 hover:text-gray-900">
                     Update your profile
                   </Link>
