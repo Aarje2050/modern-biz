@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const { user, isLoading } = useAuth()
+  const { user, loading } = useAuth()
 
   return (
     <header className="bg-white shadow-sm">
@@ -51,7 +51,7 @@ export default function Header() {
           {/* Notifications */}
           {user && <NotificationsDropdown userId={user.id} />}
 
-          {isLoading ? (
+          {loading ? (
             <div className="h-8 w-20 bg-gray-200 rounded animate-pulse"></div>
           ) : user ? (
             <UserMenu user={{
@@ -155,7 +155,7 @@ export default function Header() {
             )}
           </div>
           <div className="mt-4 space-y-2">
-            {isLoading ? (
+            {loading ? (
               <div className="h-10 bg-gray-200 rounded animate-pulse"></div>
             ) : user ? (
               <>
