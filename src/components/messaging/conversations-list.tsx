@@ -64,6 +64,8 @@ export default function ConversationsList({
   const [mounted, setMounted] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<FilterType>('all')
+  const [deletingConversation, setDeletingConversation] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
 
   // Mount check
   useEffect(() => {
@@ -181,6 +183,35 @@ export default function ConversationsList({
   const truncateMessage = (text: string, maxLength = 50) => {
     if (text.length <= maxLength) return text
     return text.substring(0, maxLength) + '...'
+  }
+
+  // Delete conversation
+  const deleteConversation = async (conversationId: string) => {
+    if (!mounted) return
+
+    setDeletingConversation(conversationId)
+    
+    // Optimistic update
+    setConversations(prev => prev.filter(conv => conv.id !== conversationId))
+    
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete conversation')
+      }
+
+      setShowDeleteConfirm(null)
+    } catch (error) {
+      console.error('Error deleting conversation:', error)
+      // Revert optimistic update
+      fetchConversations(true)
+      alert('Failed to delete conversation. Please try again.')
+    } finally {
+      setDeletingConversation(null)
+    }
   }
 
   // Filter and search conversations
@@ -361,12 +392,14 @@ export default function ConversationsList({
               return (
                 <div
                   key={conversation.id}
-                  onClick={() => onSelectConversation(conversation.id)}
-                  className={`px-4 py-3 hover:bg-gray-50 cursor-pointer transition-all duration-200 ${
+                  className={`group relative px-4 py-3 hover:bg-gray-50 cursor-pointer transition-all duration-200 ${
                     isSelected ? 'bg-blue-50 border-r-4 border-blue-500' : 'border-r-4 border-transparent'
                   }`}
                 >
-                  <div className="flex items-center space-x-3">
+                  <div 
+                    className="flex items-center space-x-3"
+                    onClick={() => onSelectConversation(conversation.id)}
+                  >
                     {/* Avatar */}
                     <div className="relative flex-shrink-0">
                       {avatarUrl ? (
@@ -444,6 +477,20 @@ export default function ConversationsList({
                       )}
                     </div>
                   </div>
+
+                  {/* Delete Button - Show on hover */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowDeleteConfirm(conversation.id)
+                    }}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full"
+                    title="Delete conversation"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               )
             })}
@@ -463,6 +510,54 @@ export default function ConversationsList({
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowDeleteConfirm(null)} />
+            
+            <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                  </div>
+                  <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
+                    <h3 className="text-base font-semibold leading-6 text-gray-900">
+                      Delete conversation
+                    </h3>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500">
+                        Are you sure you want to delete this conversation? This action cannot be undone and you will lose all messages.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                <button
+                  type="button"
+                  onClick={() => deleteConversation(showDeleteConfirm)}
+                  disabled={deletingConversation === showDeleteConfirm}
+                  className="inline-flex w-full justify-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:ml-3 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deletingConversation === showDeleteConfirm ? 'Deleting...' : 'Delete'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(null)}
+                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
