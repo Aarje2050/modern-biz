@@ -1,18 +1,14 @@
-// src/components/layout/header.tsx
+// src/components/layout/header.tsx (REPLACE YOUR EXISTING)
 'use client'
 
 import Link from 'next/link'
 import { useState } from 'react'
 import { useAuth } from '@/providers/auth-provider'
 import UserMenu from '@/components/auth/user-menu'
-import { createClient } from '@/lib/supabase/client' // Add this import
-
-
+import NotificationsDropdown from '@/components/notifications/notifications-dropdown'
+import { createClient } from '@/lib/supabase/client'
 
 export default function Header() {
-
-    
-      
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { user, isLoading } = useAuth()
 
@@ -39,6 +35,22 @@ export default function Header() {
         </div>
         
         <div className="hidden md:flex items-center space-x-4">
+          {/* Messages Link (for authenticated users) */}
+          {user && (
+            <Link
+              href="/messages"
+              className="p-2 text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 rounded-lg transition-colors"
+              title="Messages"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </Link>
+          )}
+
+          {/* Notifications */}
+          {user && <NotificationsDropdown userId={user.id} />}
+
           {isLoading ? (
             <div className="h-8 w-20 bg-gray-200 rounded animate-pulse"></div>
           ) : user ? (
@@ -121,6 +133,26 @@ export default function Header() {
             >
               Search
             </Link>
+            
+            {/* Mobile-specific links for authenticated users */}
+            {user && (
+              <>
+                <Link
+                  href="/messages"
+                  className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Messages
+                </Link>
+                <Link
+                  href="/notifications"
+                  className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Notifications
+                </Link>
+              </>
+            )}
           </div>
           <div className="mt-4 space-y-2">
             {isLoading ? (

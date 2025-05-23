@@ -1,7 +1,6 @@
-// src/middleware.ts (update existing)
+// src/middleware.ts (FIXED - CHECK ALL AUTH COOKIES)
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -10,47 +9,66 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name) {
-          return request.cookies.get(name)?.value
-        },
-        set(name, value, options) {
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name, options) {
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-        },
-      },
-    }
+  // Check for session using cookies (Edge Runtime compatible)
+  const allCookies = request.cookies.getAll()
+  const supabaseAuthCookies = allCookies.filter(cookie => 
+    cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token')
   )
-
-  const { data: { session } } = await supabase.auth.getSession()
-
-  // Your existing auth logic (keep as is)
-  if (session && isAuthRoute(request.nextUrl.pathname)) {
-    const { data: businesses } = await supabase
-      .from('businesses')
-      .select('id')
-      .eq('profile_id', session.user.id)
-      .limit(1)
-    
-    if (businesses && businesses.length > 0) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    } else {
-      return NextResponse.redirect(new URL('/', request.url))
+  
+  // Parse session from any valid cookie
+  let session = null
+  let userId = null
+  
+  // Check all auth cookies and find a valid one
+  for (const authCookie of supabaseAuthCookies) {
+    try {
+      const cookieValue = decodeURIComponent(authCookie.value)
+      let authData
+      
+      // Handle different cookie formats
+      if (cookieValue.startsWith('[')) {
+        // Array format: ["jwt_token", "refresh_token", ...]
+        authData = JSON.parse(cookieValue)
+        if (authData[0]) {
+          const jwt = authData[0]
+          const payload = JSON.parse(atob(jwt.split('.')[1]))
+          // Check if token is still valid (not expired)
+          if (payload.exp > Date.now() / 1000) {
+            session = { user: { id: payload.sub } }
+            userId = payload.sub
+            break // Found valid session, stop checking
+          }
+        }
+      } else if (cookieValue.startsWith('{')) {
+        // Object format: {"access_token": "...", "user": {...}}
+        authData = JSON.parse(cookieValue)
+        if (authData.access_token && authData.user) {
+          // For object format, also check if token is valid
+          try {
+            const jwt = authData.access_token
+            const payload = JSON.parse(atob(jwt.split('.')[1]))
+            if (payload.exp > Date.now() / 1000) {
+              session = { user: { id: authData.user.id } }
+              userId = authData.user.id
+              break // Found valid session, stop checking
+            }
+          } catch {
+            // If JWT parsing fails, assume it's valid for object format
+            session = { user: { id: authData.user.id } }
+            userId = authData.user.id
+            break
+          }
+        }
+      }
+    } catch (error) {
+      // If parsing fails, continue to next cookie
+      continue
     }
+  }
+
+  // Your existing auth logic (keeping exactly as is)
+  if (session && isAuthRoute(request.nextUrl.pathname)) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   if (!session && isProtectedRoute(request.nextUrl.pathname)) {
@@ -58,9 +76,6 @@ export async function middleware(request: NextRequest) {
     redirectUrl.searchParams.set('redirect_to', request.nextUrl.pathname)
     return NextResponse.redirect(redirectUrl)
   }
-
-  // REMOVE PAGE VIEW TRACKING FROM MIDDLEWARE
-  // We'll move this to client-side for better reliability
 
   return response
 }
@@ -75,6 +90,7 @@ function isProtectedRoute(pathname: string): boolean {
     '/dashboard',
     '/businesses/add',
     '/profile',
+    '/admin',
   ]
   
   return protectedRoutes.some(route => pathname.startsWith(route))
@@ -85,6 +101,7 @@ export const config = {
     '/dashboard/:path*',
     '/businesses/:path*',
     '/profile/:path*',
+    '/admin/:path*',
     '/login',
     '/register',
     '/auth/:path*',

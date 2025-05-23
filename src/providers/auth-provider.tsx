@@ -1,51 +1,157 @@
-// src/providers/auth-provider.tsx
+// src/providers/auth-provider.tsx (FIXED VERSION - SSR COMPATIBLE)
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Session, User } from '@supabase/supabase-js'
+import type { User, Session } from '@supabase/supabase-js'
 
-type AuthContextType = {
+interface AuthContextType {
   user: User | null
   session: Session | null
-  isLoading: boolean
+  loading: boolean
+  signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
-  isLoading: true,
+  loading: true,
+  signOut: async () => {},
 })
 
-export const useAuth = () => useContext(AuthContext)
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+  return context
+}
 
-export default function AuthProvider({ children }: { children: React.ReactNode }) {
+interface AuthProviderProps {
+  children: React.ReactNode
+}
+
+export default function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const supabase = createClient()
+  const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
-      setUser(session?.user || null)
-      setIsLoading(false)
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+
+    const supabase = createClient()
+    
+    // If no client (SSR), set loading to false and return
+    if (!supabase) {
+      setLoading(false)
+      return
     }
 
-    getSession()
+    // Get initial session
+    const getInitialSession = async () => {
+      try {
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('Error getting initial session:', error)
+        } else {
+          setSession(initialSession)
+          setUser(initialSession?.user ?? null)
+        }
+      } catch (error) {
+        console.error('Error in getInitialSession:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setUser(session?.user || null)
-      setIsLoading(false)
+    getInitialSession()
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      if (mounted) {
+        setSession(currentSession)
+        setUser(currentSession?.user ?? null)
+        setLoading(false)
+
+        // Handle specific auth events
+        switch (event) {
+          case 'SIGNED_IN':
+            console.log('User signed in:', currentSession?.user?.id)
+            break
+          case 'SIGNED_OUT':
+            console.log('User signed out')
+            break
+          case 'TOKEN_REFRESHED':
+            console.log('Token refreshed')
+            break
+          case 'USER_UPDATED':
+            console.log('User updated')
+            break
+        }
+      }
     })
 
-    return () => subscription.unsubscribe()
-  }, [supabase])
+    // Cleanup subscription
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [mounted])
+
+  const signOut = async () => {
+    const supabase = createClient()
+    if (!supabase) return
+
+    try {
+      setLoading(true)
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error('Error signing out:', error)
+        throw error
+      }
+      
+      // Clear local state
+      setUser(null)
+      setSession(null)
+    } catch (error) {
+      console.error('Sign out error:', error)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Don't render context until mounted to avoid hydration issues
+  if (!mounted) {
+    return (
+      <AuthContext.Provider value={{
+        user: null,
+        session: null,
+        loading: true,
+        signOut: async () => {},
+      }}>
+        {children}
+      </AuthContext.Provider>
+    )
+  }
+
+  const value: AuthContextType = {
+    user,
+    session,
+    loading,
+    signOut,
+  }
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )
