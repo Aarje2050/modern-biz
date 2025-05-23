@@ -1,7 +1,7 @@
-// src/components/messaging/conversations-list.tsx (FIXED VERSION)
+// src/components/messaging/conversations-list.tsx (ENHANCED VERSION)
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns'
 import Image from 'next/image'
 import { useRealtime } from '@/hooks/useRealtime'
@@ -51,6 +51,8 @@ interface ConversationsListProps {
   onSelectConversation: (id: string) => void
 }
 
+type FilterType = 'all' | 'business' | 'users'
+
 export default function ConversationsList({ 
   userId, 
   selectedConversationId, 
@@ -60,6 +62,8 @@ export default function ConversationsList({
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(true)
   const [mounted, setMounted] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all')
 
   // Mount check
   useEffect(() => {
@@ -100,7 +104,6 @@ export default function ConversationsList({
       schema: 'messaging',
       table: 'messages',
       callback: () => {
-        // Refresh conversations when new message arrives
         fetchConversations(true)
       }
     },
@@ -109,61 +112,49 @@ export default function ConversationsList({
       schema: 'messaging',
       table: 'conversations',
       callback: () => {
-        // Refresh when conversation is updated
         fetchConversations(true)
       }
     }
   ], {
-    enabled: !!userId && mounted,
-    debug: process.env.NODE_ENV === 'development',
-    reconnectOnError: true,
-    maxRetries: 3
+    enabled: !!userId && mounted
   })
 
-  // Helper functions (FIXED)
+  // Helper functions
   const getOtherParticipant = (conversation: Conversation) => {
-    // Find the participant that is NOT the current user
     return conversation.participants.find(participant => {
-      // Check if this participant's profile is not the current user
       if (participant.profile && participant.profile.id !== userId) {
         return true
       }
-      // For business conversations, check if business owner is not current user
       if (participant.business && participant.business.profile_id !== userId) {
         return true
       }
       return false
-    }) || conversation.participants[0] // Fallback to first participant
+    }) || conversation.participants[0]
   }
 
   const getConversationDisplayName = (conversation: Conversation) => {
     const otherParticipant = getOtherParticipant(conversation)
     
-    // For business conversations, show business name
     if (conversation.type === 'business_inquiry' && otherParticipant?.business) {
       return otherParticipant.business.name
     }
     
-    // For direct conversations, show other user's name
     if (otherParticipant?.profile) {
       return otherParticipant.profile.display_name || 
              otherParticipant.profile.full_name || 
              'Unknown User'
     }
     
-    // Fallback
     return conversation.type === 'business_inquiry' ? 'Business Chat' : 'Direct Message'
   }
 
   const getConversationAvatar = (conversation: Conversation) => {
     const otherParticipant = getOtherParticipant(conversation)
     
-    // For business conversations, use business logo
     if (conversation.type === 'business_inquiry' && otherParticipant?.business?.logo_url) {
       return otherParticipant.business.logo_url
     }
     
-    // For direct conversations, use user avatar
     if (otherParticipant?.profile?.avatar_url) {
       return otherParticipant.profile.avatar_url
     }
@@ -191,6 +182,30 @@ export default function ConversationsList({
     if (text.length <= maxLength) return text
     return text.substring(0, maxLength) + '...'
   }
+
+  // Filter and search conversations
+  const filteredConversations = useMemo(() => {
+    let filtered = conversations
+
+    // Apply filter
+    if (activeFilter === 'business') {
+      filtered = filtered.filter(conv => conv.type === 'business_inquiry')
+    } else if (activeFilter === 'users') {
+      filtered = filtered.filter(conv => conv.type === 'direct')
+    }
+
+    // Apply search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(conv => {
+        const displayName = getConversationDisplayName(conv).toLowerCase()
+        const lastMessage = conv.latest_message?.content?.toLowerCase() || ''
+        return displayName.includes(query) || lastMessage.includes(query)
+      })
+    }
+
+    return filtered
+  }, [conversations, activeFilter, searchQuery])
 
   // Initial fetch
   useEffect(() => {
@@ -224,15 +239,64 @@ export default function ConversationsList({
     <div className="h-full flex flex-col bg-white">
       {/* Header */}
       <div className="px-4 py-4 border-b border-gray-100 bg-white">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-900">Chats</h2>
-          {/* Connection indicator */}
           {realtimeState.isConnected && (
             <div className="flex items-center text-xs text-green-600">
               <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
               Connected
             </div>
           )}
+        </div>
+
+        {/* Search Input */}
+        <div className="relative mb-4">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="Search conversations..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            >
+              <svg className="h-4 w-4 text-gray-400 hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+          {[
+            { key: 'all' as FilterType, label: 'All', count: conversations.length },
+            { key: 'business' as FilterType, label: 'Business', count: conversations.filter(c => c.type === 'business_inquiry').length },
+            { key: 'users' as FilterType, label: 'Users', count: conversations.filter(c => c.type === 'direct').length }
+          ].map(filter => (
+            <button
+              key={filter.key}
+              onClick={() => setActiveFilter(filter.key)}
+              className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                activeFilter === filter.key
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              {filter.label}
+              {filter.count > 0 && (
+                <span className="ml-1 text-xs opacity-75">({filter.count})</span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -250,24 +314,45 @@ export default function ConversationsList({
               </div>
             ))}
           </div>
-        ) : conversations.length === 0 ? (
+        ) : filteredConversations.length === 0 ? (
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="text-center">
-              <div className="relative mx-auto w-20 h-20 mb-6">
+              <div className="relative mx-auto w-16 h-16 mb-4">
                 <div className="absolute inset-0 rounded-full bg-gray-100"></div>
-                <div className="absolute inset-3 rounded-full bg-white flex items-center justify-center">
-                  <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
+                <div className="absolute inset-2 rounded-full bg-white flex items-center justify-center">
+                  {searchQuery ? (
+                    <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  )}
                 </div>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No conversations yet</h3>
-              <p className="text-sm text-gray-500 mb-6">Start chatting with businesses and other users</p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {searchQuery ? 'No results found' : 'No conversations yet'}
+              </h3>
+              <p className="text-sm text-gray-500">
+                {searchQuery 
+                  ? `No conversations match "${searchQuery}"`
+                  : 'Start chatting with businesses and other users'
+                }
+              </p>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Clear search
+                </button>
+              )}
             </div>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {conversations.map((conversation) => {
+            {filteredConversations.map((conversation) => {
               const avatarUrl = getConversationAvatar(conversation)
               const displayName = getConversationDisplayName(conversation)
               const initials = getConversationInitials(conversation)
@@ -364,7 +449,7 @@ export default function ConversationsList({
             })}
             
             {/* Load More */}
-            {hasMore && (
+            {hasMore && !searchQuery && (
               <div className="p-4 text-center border-t border-gray-100">
                 <button
                   onClick={() => fetchConversations(false)}

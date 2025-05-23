@@ -1,4 +1,4 @@
-// src/components/messaging/message-thread.tsx (MODERN WHATSAPP-LIKE VERSION)
+// src/components/messaging/message-thread.tsx (MOBILE OPTIMIZED WITH EMOJI)
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -29,6 +29,13 @@ interface MessageThreadProps {
   userId: string
 }
 
+// Simple emoji list - lightweight solution
+const QUICK_EMOJIS = [
+  '😀', '😂', '🥰', '😍', '🤔', '😢', '😴', '🤯',
+  '👍', '👎', '❤️', '🔥', '💯', '😎', '🙌', '🤝',
+  '🎉', '💪', '🚀', '⭐', '✨', '💡', '☕', '🍕'
+]
+
 export default function MessageThread({ conversationId, userId }: MessageThreadProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,22 +43,48 @@ export default function MessageThread({ conversationId, userId }: MessageThreadP
   const [newMessage, setNewMessage] = useState('')
   const [hasMore, setHasMore] = useState(true)
   const [mounted, setMounted] = useState(false)
-  const [isTyping, setIsTyping] = useState(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const emojiPickerRef = useRef<HTMLDivElement>(null)
 
-  // Mount check
+  // Mount check and mobile detection
   useEffect(() => {
     setMounted(true)
+    
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    
+    return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false)
+      }
+    }
+
+    if (mounted) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [mounted])
 
   // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+      const scrollHeight = textareaRef.current.scrollHeight
+      textareaRef.current.style.height = `${Math.min(scrollHeight, 120)}px` // Max 120px height
     }
   }, [newMessage])
 
@@ -61,6 +94,13 @@ export default function MessageThread({ conversationId, userId }: MessageThreadP
       behavior: smooth ? 'smooth' : 'auto',
       block: 'end'
     })
+  }
+
+  // Add emoji to message
+  const addEmoji = (emoji: string) => {
+    setNewMessage(prev => prev + emoji)
+    setShowEmojiPicker(false)
+    textareaRef.current?.focus()
   }
 
   // Fetch messages
@@ -138,15 +178,13 @@ export default function MessageThread({ conversationId, userId }: MessageThreadP
       if (!response.ok) throw new Error('Failed to send message')
 
       const data = await response.json()
-      // Replace temp message with real one
       setMessages(prev => 
         prev.map(msg => msg.id === tempMessage.id ? data.message : msg)
       )
     } catch (error) {
       console.error('Error sending message:', error)
-      // Remove temp message on error
       setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id))
-      setNewMessage(messageContent) // Restore message
+      setNewMessage(messageContent)
       alert('Failed to send message. Please try again.')
     } finally {
       setSending(false)
@@ -163,7 +201,6 @@ export default function MessageThread({ conversationId, userId }: MessageThreadP
       callback: (payload) => {
         const newMessage = payload.new as Message
         setMessages(prev => {
-          // Avoid duplicates and don't add if it's a temp message
           if (prev.some(msg => msg.id === newMessage.id) || newMessage.sender.id === userId) {
             return prev
           }
@@ -173,10 +210,7 @@ export default function MessageThread({ conversationId, userId }: MessageThreadP
       }
     }
   ], {
-    enabled: !!conversationId && mounted,
-    debug: process.env.NODE_ENV === 'development',
-    reconnectOnError: true,
-    maxRetries: 3
+    enabled: !!conversationId && mounted
   })
 
   // Helper functions
@@ -244,11 +278,14 @@ export default function MessageThread({ conversationId, userId }: MessageThreadP
   const messageGroups = groupMessagesByDate(messages)
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      {/* Messages Container */}
+    <div className="flex flex-col h-full bg-gray-50 relative">
+      {/* Messages Container - Mobile optimized height */}
       <div 
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+        style={{ 
+          paddingBottom: isMobile ? '80px' : '16px' // Space for fixed input on mobile
+        }}
       >
         {/* Load More Button */}
         {hasMore && messages.length > 0 && (
@@ -402,9 +439,41 @@ export default function MessageThread({ conversationId, userId }: MessageThreadP
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Message Input */}
-      <div className="bg-white border-t border-gray-200 px-4 py-3">
+      {/* Message Input - Fixed at bottom on mobile */}
+      <div className={`bg-white border-t border-gray-200 px-4 py-3 ${
+        isMobile ? 'fixed bottom-0 left-0 right-0 z-50' : ''
+      }`}>
+        {/* Emoji Picker */}
+        {showEmojiPicker && (
+          <div ref={emojiPickerRef} className="absolute bottom-full left-4 right-4 mb-2">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 max-h-48 overflow-y-auto">
+              <div className="grid grid-cols-8 gap-2">
+                {QUICK_EMOJIS.map((emoji, index) => (
+                  <button
+                    key={index}
+                    onClick={() => addEmoji(emoji)}
+                    className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors text-lg"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={sendMessage} className="flex items-end space-x-3">
+          {/* Emoji Button */}
+          <button
+            type="button"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="flex-shrink-0 p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+
           {/* Text Input */}
           <div className="flex-1 relative">
             <textarea
@@ -414,8 +483,8 @@ export default function MessageThread({ conversationId, userId }: MessageThreadP
               placeholder="Type a message..."
               disabled={sending}
               rows={1}
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 max-h-32 overflow-y-auto"
-              style={{ minHeight: '44px' }}
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 overflow-y-auto"
+              style={{ minHeight: '44px', maxHeight: '120px' }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
