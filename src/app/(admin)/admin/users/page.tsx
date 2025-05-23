@@ -20,12 +20,26 @@ export default function AdminUsersPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [processingUser, setProcessingUser] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
   const pageSize = 10
   
   const supabase = createClient()
+  // Add null check
+  if (!supabase) {
+    setError('Unable to connect to database')
+    setLoading(false)
+    return
+  }
   
   useEffect(() => {
     async function fetchUsers() {
+      // Add null check
+      if (!supabase) {
+        setError('Unable to connect to database')
+        setLoading(false)
+        return
+      }
       try {
         setLoading(true)
         
