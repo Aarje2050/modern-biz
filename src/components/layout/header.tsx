@@ -176,6 +176,11 @@ export default function Header() {
                 <button
                   onClick={async () => {
                     const supabase = createClient()
+// Add null check
+if (!supabase) {
+  
+  return
+}
                     await supabase.auth.signOut()
                     window.location.href = '/'
                   }}

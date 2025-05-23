@@ -2,9 +2,21 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
+import { useState } from 'react'
+
 
 export default function SignOutButton() {
   const supabase = createClient()
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+
+  // Add null check
+  if (!supabase) {
+    setError('Unable to connect to database')
+    setLoading(false)
+    return
+  }
   
   const handleSignOut = async () => {
     await supabase.auth.signOut()

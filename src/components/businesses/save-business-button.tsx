@@ -13,7 +13,18 @@ type SaveBusinessButtonProps = {
 export default function SaveBusinessButton({ businessId, isSaved = false, savedId }: SaveBusinessButtonProps) {
   const [saved, setSaved] = useState(isSaved)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+
   const supabase = createClient()
+
+  // Add null check
+  if (!supabase) {
+    setError('Unable to connect to database')
+    setLoading(false)
+    return
+  }
   
   const handleToggleSave = async () => {
     setIsLoading(true)

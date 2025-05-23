@@ -18,6 +18,12 @@ export default function ProfileForm({ profile, userId }: ProfileFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<{text: string; type: 'success' | 'error'} | null>(null)
   const supabase = createClient()
+
+  // Add null check
+  if (!supabase) {
+    
+    return
+  }
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target

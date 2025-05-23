@@ -17,6 +17,16 @@ export default function RegisterForm() {
   const redirectTo = searchParams.get('redirect_to') || '/'
   const supabase = createClient()
 
+  const [loading, setLoading] = useState(true)
+
+  // Add null check
+  if (!supabase) {
+    setError('Unable to connect to database')
+    setLoading(false)
+    return
+  }
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)

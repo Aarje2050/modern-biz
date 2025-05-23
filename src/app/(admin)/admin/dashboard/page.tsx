@@ -23,11 +23,19 @@ export default function AdminDashboardPage() {
   })
   const [loading, setLoading] = useState(true)
   const [recentBusinesses, setRecentBusinesses] = useState<any[]>([])
+  const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
+  
   
   // src/app/(admin)/admin/page.tsx - Fix the count issue
 useEffect(() => {
     async function fetchData() {
+      // Add null check
+      if (!supabase) {
+        setError('Unable to connect to database')
+        setLoading(false)
+        return
+      }
       
 // Replace the recent businesses fetch with this simpler version:
 

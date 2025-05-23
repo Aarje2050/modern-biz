@@ -18,9 +18,19 @@ type UserMenuProps = {
 
 export default function UserMenu({ user }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+
   const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
+  // Add null check
+  if (!supabase) {
+    setError('Unable to connect to database')
+    setLoading(false)
+    return
+  }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()

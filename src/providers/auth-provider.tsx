@@ -84,16 +84,16 @@ export default function AuthProvider({ children }: AuthProviderProps) {
         // Handle specific auth events
         switch (event) {
           case 'SIGNED_IN':
-            console.log('User signed in:', currentSession?.user?.id)
+            
             break
           case 'SIGNED_OUT':
-            console.log('User signed out')
+            
             break
           case 'TOKEN_REFRESHED':
-            console.log('Token refreshed')
+            
             break
           case 'USER_UPDATED':
-            console.log('User updated')
+            
             break
         }
       }

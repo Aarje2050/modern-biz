@@ -21,6 +21,15 @@ export default function ImageUpload({
   const [imageUrl, setImageUrl] = useState<string | null>(existingUrl || null)
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
+
+  const [loading, setLoading] = useState(true)
+   // Add null check
+   if (!supabase) {
+    setError('Unable to connect to database')
+    setLoading(false)
+    return
+  }
+
   
   const uploadImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {

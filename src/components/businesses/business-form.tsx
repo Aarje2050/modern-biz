@@ -48,10 +48,18 @@ export default function BusinessForm() {
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
   
   const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+
   const [error, setError] = useState<string | null>(null)
   const [step, setStep] = useState(1)
   const router = useRouter()
   const supabase = createClient()
+  // Add null check
+  if (!supabase) {
+    setError('Unable to connect to database')
+    setLoading(false)
+    return
+  }
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target

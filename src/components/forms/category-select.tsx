@@ -23,10 +23,18 @@ export default function CategorySelect({
 }: CategorySelectProps) {
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const supabase = createClient()
   
   useEffect(() => {
     async function loadCategories() {
+      // Add null check
+      if (!supabase) {
+        setError('Unable to connect to database')
+        setLoading(false)
+        return
+      }
       try {
         const { data, error } = await supabase
           .from('categories')

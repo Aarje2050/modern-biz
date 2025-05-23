@@ -9,11 +9,21 @@ import Link from 'next/link'
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
-  const router = useRouter()
+  const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
+
+  const router = useRouter()
+  
   
   useEffect(() => {
     async function checkAdmin() {
+      
+  // Add null check
+  if (!supabase) {
+    setError('Unable to connect to database')
+    setLoading(false)
+    return
+  }
       try {
         // Get current session
         const { data: { session } } = await supabase.auth.getSession()

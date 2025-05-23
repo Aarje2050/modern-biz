@@ -20,6 +20,7 @@ export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+
   // Add this state for bulk import
 const [bulkCategories, setBulkCategories] = useState('')
 const [importFormat, setImportFormat] = useState<'csv' | 'json'>('csv')
@@ -32,12 +33,19 @@ const [importResult, setImportResult] = useState<{success?: string; error?: stri
   })
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
+  // Add null check
+  if (!supabase) {
+    setError('Unable to connect to database')
+    setLoading(false)
+    return
+  }
   
   useEffect(() => {
     fetchCategories()
   }, [])
   
   const fetchCategories = async () => {
+   
     try {
       setLoading(true)
       

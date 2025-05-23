@@ -13,8 +13,16 @@ export default function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [loading, setLoading] = useState(true)
+
   const redirectTo = searchParams.get('redirect_to') || '/'
   const supabase = createClient()
+  // Add null check
+  if (!supabase) {
+    setError('Unable to connect to database')
+    setLoading(false)
+    return
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

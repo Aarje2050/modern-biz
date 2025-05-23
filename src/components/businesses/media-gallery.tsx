@@ -19,12 +19,30 @@ type MediaItem = {
 export default function MediaGallery({ businessId }: MediaGalleryProps) {
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([])
   const [uploading, setUploading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
+
+  // Add null check
+  if (!supabase) {
+    setError('Unable to connect to database')
+    setLoading(false)
+    return
+  }
+
+  
   
   // Load existing media
   useEffect(() => {
     async function loadMedia() {
+
+      // Add null check
+      if (!supabase) {
+        setError('Unable to connect to database')
+        setLoading(false)
+        return
+      }
+       
       try {
         const { data, error } = await supabase
           .from('media')

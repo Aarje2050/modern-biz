@@ -15,6 +15,8 @@ export default function AdminBusinessesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
   const pageSize = 10
   
   const supabase = createClient()
@@ -24,6 +26,13 @@ export default function AdminBusinessesPage() {
 // Replace the fetchBusinesses function with this:
 
 async function fetchBusinesses() {
+      
+      // Add null check
+      if (!supabase) {
+        setError('Unable to connect to database')
+        setLoading(false)
+        return
+      }
     try {
       setLoading(true)
       console.log('Fetching businesses with filter:', statusFilter)

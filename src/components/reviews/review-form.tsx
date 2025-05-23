@@ -17,8 +17,16 @@ export default function ReviewForm({ businessId, onReviewSubmitted }: ReviewForm
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [userHasReviewed, setUserHasReviewed] = useState(false)
+  const [loading, setLoading] = useState(true)
+
   
   const supabase = createClient()
+  // Add null check
+  if (!supabase) {
+    setError('Unable to connect to database')
+    setLoading(false)
+    return
+  }
   
   // Check if user has already reviewed this business
   const checkExistingReview = async () => {

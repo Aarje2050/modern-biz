@@ -21,7 +21,15 @@ const initialCategories = [
 export default function AdminSetupPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{success?: string; error?: string} | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
   const supabase = createClient()
+// Add null check
+if (!supabase) {
+  setError('Unable to connect to database')
+  setLoading(false)
+  return
+}
   
   const generateSlug = (name: string) => {
     return name

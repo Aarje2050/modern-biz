@@ -19,6 +19,12 @@ export default function BusinessMediaPage() {
   
   useEffect(() => {
     async function loadBusiness() {
+      // Add null check
+      if (!supabase) {
+        setError('Unable to connect to database')
+        setLoading(false)
+        return
+      }
       try {
         // Get the current session
         const { data: { session } } = await supabase.auth.getSession()

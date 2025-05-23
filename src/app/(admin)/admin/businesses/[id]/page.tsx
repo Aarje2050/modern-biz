@@ -1,4 +1,4 @@
-// src/app/(admin)/admin/businesses/[id]/page.tsx
+// src/app/(admin)/admin/businesses/[id]/page.tsx (MINIMAL FIX)
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -15,68 +15,79 @@ export default function AdminBusinessDetailPage() {
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [moderationNotes, setModerationNotes] = useState('')
-  const supabase = createClient()
   
   useEffect(() => {
-    // src/app/(admin)/admin/businesses/[id]/page.tsx
-// Update the fetchBusinessDetails function:
+    async function fetchBusinessDetails() {
+      const supabase = createClient()
+      
+      // Add null check
+      if (!supabase) {
+        setError('Unable to connect to database')
+        setLoading(false)
+        return
+      }
 
-async function fetchBusinessDetails() {
-    try {
-      // Get the business details first
-      const { data: business, error: businessError } = await supabase
-        .from('businesses')
-        .select('*')
-        .eq('id', params.id)
-        .single()
-        
-      if (businessError) throw businessError
-      
-      // Get owner profile separately
-      let businessWithRelations = { ...business }
-      
-      if (business.profile_id) {
-        const { data: profile } = await supabase
-          .from('profiles')
+      try {
+        // Get the business details first
+        const { data: business, error: businessError } = await supabase
+          .from('businesses')
           .select('*')
-          .eq('id', business.profile_id)
+          .eq('id', params.id)
           .single()
           
-        businessWithRelations.profiles = profile
+        if (businessError) throw businessError
+        
+        // Get owner profile separately
+        let businessWithRelations = { ...business }
+        
+        if (business.profile_id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', business.profile_id)
+            .single()
+            
+          businessWithRelations.profiles = profile
+        }
+        
+        // Get locations separately
+        const { data: locations } = await supabase
+          .from('locations')
+          .select('*')
+          .eq('business_id', business.id)
+          
+        businessWithRelations.locations = locations || []
+        
+        // Get contacts separately
+        const { data: contacts } = await supabase
+          .from('business_contacts')
+          .select('*')
+          .eq('business_id', business.id)
+          
+        businessWithRelations.business_contacts = contacts || []
+        
+        setBusiness(businessWithRelations)
+        setModerationNotes(businessWithRelations.moderation_notes || '')
+      } catch (error: any) {
+        console.error('Error fetching business details:', error)
+        setError(error.message)
+      } finally {
+        setLoading(false)
       }
-      
-      // Get locations separately
-      const { data: locations } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('business_id', business.id)
-        
-      businessWithRelations.locations = locations || []
-      
-      // Get contacts separately
-      const { data: contacts } = await supabase
-        .from('business_contacts')
-        .select('*')
-        .eq('business_id', business.id)
-        
-      businessWithRelations.business_contacts = contacts || []
-      
-      console.log('Business with relations:', businessWithRelations)
-      
-      setBusiness(businessWithRelations)
-      setModerationNotes(businessWithRelations.moderation_notes || '')
-    } catch (error: any) {
-      console.error('Error fetching business details:', error)
-      setError(error.message)
-    } finally {
-      setLoading(false)
     }
-  }
     
     fetchBusinessDetails()
-  }, [params.id, supabase])
+  }, [params.id])
   
   const handleStatusChange = async (status: 'active' | 'rejected' | 'pending') => {
+    const supabase = createClient()
+    
+    // Add null check
+    if (!supabase) {
+      setError('Unable to connect to database')
+      return
+    }
+
     try {
       setProcessing(true)
       
@@ -141,6 +152,7 @@ async function fetchBusinessDetails() {
   
   return (
     <div>
+      {/* REST OF YOUR EXISTING JSX - NO CHANGES NEEDED */}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <Link href="/admin/businesses" className="text-blue-600 hover:underline text-sm">
@@ -188,7 +200,6 @@ async function fetchBusinessDetails() {
             <h2 className="text-lg font-medium mb-4">Media</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
-              
                <h3 className="text-sm font-medium text-gray-500 mb-2">Logo</h3>
                {business.logo_url ? (
                  <div className="relative w-32 h-32 border rounded-full overflow-hidden">
