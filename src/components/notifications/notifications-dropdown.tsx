@@ -88,10 +88,7 @@ export default function NotificationsDropdown({ userId }: NotificationsDropdownP
   ], {
     enabled: !!userId && mounted,
     debug: process.env.NODE_ENV === 'development',
-    reconnectOnError: true,
-    maxRetries: 3,
-    fallbackToPolling: true,
-    pollingInterval: 30000
+    
   })
 
   // Close dropdown when clicking outside
@@ -294,7 +291,7 @@ export default function NotificationsDropdown({ userId }: NotificationsDropdownP
           <div className="p-4 border-b border-gray-200 flex justify-between items-center">
             <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
             <div className="flex items-center space-x-2">
-              {/* Connection Status */}
+              {/* Connection Status
               {realtimeState.error && (
                 <button
                   onClick={realtimeState.forceReconnect}
@@ -306,7 +303,7 @@ export default function NotificationsDropdown({ userId }: NotificationsDropdownP
                   </svg>
                   Retry
                 </button>
-              )}
+              )} */}
               {unreadCount > 0 && (
                 <button
                   onClick={() => markAsRead()}
