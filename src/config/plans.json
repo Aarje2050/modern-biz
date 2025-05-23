@@ -1,0 +1,84 @@
+{
+  "plans": {
+    "free": {
+      "id": "free",
+      "name": "Free",
+      "description": "Perfect for getting started",
+      "price": 0,
+      "currency": "USD",
+      "billing_period": "month",
+      "features": {
+        "business_listings": 1,
+        "photos_per_business": 5,
+        "review_responses": true,
+        "basic_analytics": true,
+        "premium_analytics": false,
+        "featured_listing": false,
+        "priority_support": false,
+        "custom_branding": false,
+        "api_access": false,
+        "multiple_locations": 1
+      },
+      "limits": {
+        "max_businesses": 1,
+        "max_photos": 5,
+        "max_locations_per_business": 1,
+        "analytics_retention_days": 30
+      },
+      "stripe_price_id": null,
+      "razorpay_plan_id": null
+    },
+    "premium": {
+      "id": "premium",
+      "name": "Premium",
+      "description": "Unlock all features for your business",
+      "price": 29,
+      "currency": "USD",
+      "billing_period": "month",
+      "features": {
+        "business_listings": -1,
+        "photos_per_business": 50,
+        "review_responses": true,
+        "basic_analytics": true,
+        "premium_analytics": true,
+        "featured_listing": true,
+        "priority_support": true,
+        "custom_branding": true,
+        "api_access": true,
+        "multiple_locations": -1
+      },
+      "limits": {
+        "max_businesses": -1,
+        "max_photos": 50,
+        "max_locations_per_business": -1,
+        "analytics_retention_days": 365
+      },
+      "stripe_price_id": "price_premium_monthly",
+      "razorpay_plan_id": "plan_premium_monthly",
+      "popular": true
+    }
+  },
+  "currencies": {
+    "USD": {
+      "symbol": "$",
+      "name": "US Dollar"
+    },
+    "INR": {
+      "symbol": "₹",
+      "name": "Indian Rupee"
+    }
+  },
+  "payment_methods": {
+    "stripe": {
+      "enabled": true,
+      "supported_countries": ["US", "CA", "GB", "AU", "EU"],
+      "supported_currencies": ["USD", "EUR", "GBP", "CAD", "AUD"]
+    },
+    "razorpay": {
+      "enabled": true,
+      "supported_countries": ["IN"],
+      "supported_currencies": ["INR"],
+      "methods": ["card", "netbanking", "wallet", "upi"]
+    }
+  }
+}
