@@ -9,6 +9,8 @@ type ReviewFormProps = {
   onReviewSubmitted?: () => void
 }
 
+
+
 export default function ReviewForm({ businessId, onReviewSubmitted }: ReviewFormProps) {
   const [rating, setRating] = useState<number>(0)
   const [title, setTitle] = useState('')
@@ -91,10 +93,26 @@ export default function ReviewForm({ businessId, onReviewSubmitted }: ReviewForm
           status: 'published', // Or 'pending' if you want moderation
         })
       
-      if (reviewError) {
-        console.error('Review submission error:', reviewError)
-        throw new Error(reviewError.message || 'Failed to submit your review')
-      }
+        // In review-form.tsx, after the review insertion, add:
+if (reviewError) {
+  console.error('Review submission error:', reviewError)
+  throw new Error(reviewError.message || 'Failed to submit your review')
+}
+
+// Auto-create CRM contact
+try {
+  fetch('/api/crm/integration/auto-contact', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      business_id: businessId,
+      profile_id: session.user.id,
+      rating,
+      title: title.trim() || null,
+      content: content.trim()
+    })
+  }).catch(() => {}) // Silent fail - don't break review submission
+} catch {} // Silent fail
       
       // Success
       setSuccess('Your review has been submitted successfully!')

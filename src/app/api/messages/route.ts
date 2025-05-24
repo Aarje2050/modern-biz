@@ -1,6 +1,8 @@
 // src/app/api/messages/route.ts (FIXED VERSION)
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { MessagingEmailIntegrations } from '@/lib/email/integrations/messaging'
+
 
 // GET /api/messages - Get messages for a conversation
 export async function GET(request: NextRequest) {
@@ -56,6 +58,7 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching messages:', error)
       return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 })
     }
+    
 
     // Get sender info separately
     const messagesWithSender = await Promise.all(
