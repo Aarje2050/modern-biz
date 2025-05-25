@@ -2,7 +2,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ['krmmxfmvssmzcmbitvil.supabase.co'],
+    domains: ['krmmxfmvssmzcmbitvil.supabase.co', 'ductcleaningca.com'],
   },
 
   webpack: (config, { isServer }) => {
