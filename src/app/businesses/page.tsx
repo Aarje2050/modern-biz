@@ -1,31 +1,18 @@
-// src/app/businesses/page.tsx (modified version)
+// src/app/businesses/page.tsx (Site-Aware with Better Design)
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentSite } from '@/lib/site-context'
 import Link from 'next/link'
+import Image from 'next/image'
 import BusinessCard from '@/components/businesses/business-card'
 import Pagination from '@/components/ui/pagination'
-import BusinessFilters from '@/components/businesses/business-filters'
+import type { Metadata } from 'next'
 
 // Number of businesses per page
 const PAGE_SIZE = 12
 
-export const metadata = {
-  title: 'Businesses - Business Directory',
-  description: 'Browse businesses in our directory. Find local businesses, services, and more.',
-  alternates: {
-    canonical: '/businesses'
-  },
-  openGraph: {
-    title: 'Business Directory - Browse All Businesses',
-    description: 'Discover and connect with local businesses in our comprehensive directory.',
-    url: '/businesses',
-    siteName: 'Business Directory',
-    type: 'website'
-  }
-}
-
 type SortOption = 'name_asc' | 'name_desc' | 'newest' | 'oldest'
 
-type BusinessWithLocation = {
+interface BusinessWithLocation {
   id: string
   name: string
   slug: string
@@ -37,57 +24,134 @@ type BusinessWithLocation = {
   savedId?: string | null
 }
 
-export const revalidate = 60;
+interface Category {
+  id: string
+  name: string
+  slug: string
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const siteConfig = getCurrentSite()
+  
+  if (!siteConfig) {
+    return {
+      title: 'Businesses - Business Directory',
+      description: 'Browse businesses in our directory',
+    }
+  }
+
+  const niche = siteConfig.config?.niche || 'business'
+  const location = siteConfig.config?.location || ''
+  
+  const title = `${niche.charAt(0).toUpperCase() + niche.slice(1)} Services${location ? ` in ${location.charAt(0).toUpperCase() + location.slice(1)}` : ''} - ${siteConfig.name}`
+  const description = `Browse ${niche} services${location ? ` in ${location}` : ''}. Find verified professionals, read reviews, and get quotes.`
+
+  return {
+    title,
+    description,
+    keywords: `${niche} services, ${location}, professionals, directory, reviews`,
+    openGraph: {
+      title,
+      description,
+      url: '/businesses',
+      siteName: siteConfig.name,
+      type: 'website',
+    },
+    alternates: {
+      canonical: '/businesses',
+    }
+  }
+}
+
+export const revalidate = 60
+
 export default async function BusinessesPage({
   searchParams
 }: {
-  searchParams: { page?: string; sort?: SortOption; category?: string }
+  searchParams: { 
+    page?: string
+    sort?: SortOption
+    category?: string
+    search?: string
+  }
 }) {
-  const supabase = await createClient()
+  const siteConfig = getCurrentSite()
+  
+  if (!siteConfig) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Site Not Found</h1>
+          <p className="text-gray-600">This domain is not configured in our system.</p>
+        </div>
+      </div>
+    )
+  }
+
+  const supabase = createClient()
   const currentPage = searchParams.page ? parseInt(searchParams.page, 10) : 1
   const sortOption = searchParams.sort || 'name_asc'
   const categorySlug = searchParams.category
+  const searchQuery = searchParams.search?.toLowerCase() || ''
+  
+  const niche = siteConfig.config?.niche || 'business'
+  const location = siteConfig.config?.location || ''
   
   // Check if user is authenticated
   const { data: { session } } = await supabase.auth.getSession()
   
-  // Get category if filter is applied
-  let categoryFilter = null
+  // Get category if filter is applied (only from this site)
+  let categoryFilter: Category | null = null
   if (categorySlug) {
     const { data: category } = await supabase
       .from('categories')
       .select('id, name, slug')
       .eq('slug', categorySlug)
+      .eq('site_id', siteConfig.id)
       .single()
       
     categoryFilter = category
   }
   
-  // Get all categories for the filter
+  // Get all categories for this site for the filter
   const { data: categories } = await supabase
     .from('categories')
     .select('id, name, slug')
+    .eq('site_id', siteConfig.id)
     .order('name')
   
   // Calculate pagination offsets
   const from = (currentPage - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
   
-  // Build the base query for businesses
+  // Build the base query for businesses (site-specific)
   let businessQuery = supabase
     .from('businesses')
     .select('id, name, slug, short_description, logo_url', { count: 'exact' })
+    .eq('site_id', siteConfig.id)
     .eq('status', 'active')
+  
+  // Apply search filter if provided
+  if (searchQuery) {
+    businessQuery = businessQuery.or(`name.ilike.%${searchQuery}%,short_description.ilike.%${searchQuery}%`)
+  }
   
   // Apply category filter if selected
   if (categoryFilter) {
-    // Use a subquery to filter by category
-    businessQuery = businessQuery.filter('id', 'in', 
-      supabase
-        .from('business_categories')
-        .select('business_id')
-        .eq('category_id', categoryFilter.id)
-    )
+    // Get business IDs in this category
+    const { data: categoryBusinesses } = await supabase
+      .from('business_categories')
+      .select('business_id')
+      .eq('category_id', categoryFilter.id)
+    
+    const businessIds = (categoryBusinesses || []).map(cb => cb.business_id)
+    
+    if (businessIds.length > 0) {
+      businessQuery = businessQuery.in('id', businessIds)
+    } else {
+      // No businesses in this category, force empty result
+      businessQuery = businessQuery.eq('id', 'non-existent-id')
+    }
   }
   
   // Apply sorting
@@ -132,7 +196,7 @@ export default async function BusinessesPage({
     
     if (session) {
       const { data: savedBusiness } = await supabase
-        .from('core.saved_businesses')
+        .from('saved_businesses')
         .select('id')
         .eq('profile_id', session.user.id)
         .eq('business_id', business.id)
@@ -152,61 +216,208 @@ export default async function BusinessesPage({
   }))
   
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Browse Businesses</h1>
-      
-      {/* Client-side filters component */}
-      <BusinessFilters 
-        categories={categories || []} 
-        currentCategorySlug={categorySlug}
-        currentSort={sortOption}
-      />
-      
-      {/* Results summary */}
-      <div className="mb-6">
-        <p className="text-gray-600 text-sm">
-          {totalBusinesses} {totalBusinesses === 1 ? 'business' : 'businesses'} found
-          {categoryFilter ? ` in ${categoryFilter.name}` : ''}
-        </p>
-      </div>
-      
-      {/* Business Listings */}
-      {enhancedBusinesses && enhancedBusinesses.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {enhancedBusinesses.map(business => (
-            <BusinessCard 
-              key={business.id} 
-              business={business} 
-              isSaved={business.isSaved} 
-              savedId={business.savedId} 
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h3 className="mt-4 text-lg font-medium text-gray-900">No businesses found</h3>
-          <p className="mt-2 text-gray-500">
-            {categoryFilter 
-              ? `There are no businesses in the ${categoryFilter.name} category.`
-              : 'There are no businesses in the directory yet.'}
-          </p>
-          <div className="mt-6">
-            <Link 
-              href="/businesses/add" 
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-800 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-            >
-              Add Your Business
-            </Link>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header Section */}
+      <section className="bg-gradient-to-r from-red-600 to-red-700 text-white py-12">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            <h1 className="text-4xl font-bold mb-4">
+              Browse {niche.charAt(0).toUpperCase() + niche.slice(1)} Services
+              {location && (
+                <span className="block text-2xl font-normal mt-2 text-red-100">
+                  in {location.charAt(0).toUpperCase() + location.slice(1)}
+                </span>
+              )}
+            </h1>
+            <p className="text-xl text-red-100 mb-8">
+              {categoryFilter 
+                ? `Find ${categoryFilter.name.toLowerCase()} services near you`
+                : `Discover verified ${niche} professionals in your area`}
+            </p>
+            
+            {/* Search and Filters */}
+            <div className="max-w-4xl mx-auto space-y-4">
+              {/* Search Box */}
+              <form method="GET" action="/businesses" className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    name="search"
+                    defaultValue={searchQuery}
+                    placeholder={`Search ${niche} services...`}
+                    className="w-full px-6 py-3 text-gray-900 placeholder-gray-500 focus:outline-none rounded-lg"
+                  />
+                </div>
+                
+                {/* Category Filter */}
+                <select 
+                  name="category"
+                  defaultValue={categorySlug || ''}
+                  className="px-4 py-3 text-gray-900 focus:outline-none rounded-lg"
+                >
+                  <option value="">All Categories</option>
+                  {categories?.map(category => (
+                    <option key={category.id} value={category.slug}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+                
+                {/* Sort Filter */}
+                <select 
+                  name="sort"
+                  defaultValue={sortOption}
+                  className="px-4 py-3 text-gray-900 focus:outline-none rounded-lg"
+                >
+                  <option value="name_asc">Name A-Z</option>
+                  <option value="name_desc">Name Z-A</option>
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                </select>
+                
+                {/* Hidden inputs to preserve other filters */}
+                {searchParams.page && <input type="hidden" name="page" value="1" />}
+                
+                <button
+                  type="submit"
+                  className="bg-white text-red-600 hover:bg-gray-100 px-8 py-3 rounded-lg font-semibold transition-colors"
+                >
+                  Search
+                </button>
+              </form>
+            </div>
           </div>
         </div>
-      )}
-      
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Pagination currentPage={currentPage} totalPages={totalPages} />
+      </section>
+
+      {/* Results Section */}
+      <section className="py-12">
+        <div className="container mx-auto px-4">
+          {/* Results Summary & Actions */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <p className="text-gray-600">
+                  {totalBusinesses} {totalBusinesses === 1 ? 'service' : 'services'} found
+                  {categoryFilter && ` in ${categoryFilter.name}`}
+                  {searchQuery && ` for "${searchQuery}"`}
+                </p>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                {(searchQuery || categoryFilter) && (
+                  <Link
+                    href="/businesses"
+                    className="text-red-600 hover:text-red-700 font-medium"
+                  >
+                    Clear filters
+                  </Link>
+                )}
+                
+                <Link
+                  href="/businesses/add"
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Add Your Business
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Business Listings */}
+          {enhancedBusinesses && enhancedBusinesses.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+                {enhancedBusinesses.map(business => (
+                  <BusinessCard 
+                    key={business.id} 
+                    business={business} 
+                    isSaved={business.isSaved} 
+                    savedId={business.savedId} 
+                  />
+                ))}
+              </div>
+              
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-center">
+                  <Pagination 
+                    currentPage={currentPage} 
+                    totalPages={totalPages}
+                    baseUrl="/businesses"
+                    searchParams={searchParams}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+              <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0h3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              <h3 className="text-xl font-medium text-gray-900 mb-2">
+                {searchQuery || categoryFilter 
+                  ? 'No services match your search'
+                  : `No ${niche} services listed yet`}
+              </h3>
+              <p className="text-gray-500 mb-6">
+                {searchQuery || categoryFilter 
+                  ? 'Try adjusting your search criteria or browse all services.'
+                  : `Be the first to list your ${niche} business in our directory.`}
+              </p>
+              <div className="space-x-4">
+                {(searchQuery || categoryFilter) && (
+                  <Link
+                    href="/businesses"
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Browse All Services
+                  </Link>
+                )}
+                <Link 
+                  href="/businesses/add" 
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700"
+                >
+                  Add Your Business
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Quick Categories Section */}
+      {categories && categories.length > 0 && (
+        <section className="py-12 bg-white border-t">
+          <div className="container mx-auto px-4">
+            <h2 className="text-2xl font-bold text-center mb-8">
+              Browse by Category
+            </h2>
+            <div className="flex flex-wrap justify-center gap-3">
+              {categories.slice(0, 10).map((category) => (
+                <Link
+                  key={category.id}
+                  href={`/businesses?category=${category.slug}`}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    categorySlug === category.slug
+                      ? 'bg-red-600 text-white'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  {category.name}
+                </Link>
+              ))}
+              {categories.length > 10 && (
+                <Link
+                  href="/categories"
+                  className="px-4 py-2 rounded-full text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700"
+                >
+                  View All Categories
+                </Link>
+              )}
+            </div>
+          </div>
+        </section>
       )}
     </div>
   )
