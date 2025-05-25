@@ -94,7 +94,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   Categories
 </Link>
                   <Link href="/admin/users" className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700">
-                    Users
+                    Manage Users
+                  </Link>
+                  <Link href="/admin/sites" className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700">
+                    Site Management
+                  </Link>
+                  <Link href="/admin/bulk-assign" className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700">
+                    Bulk Assign
                   </Link>
                   <Link href="/" className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700">
                     Back to Site

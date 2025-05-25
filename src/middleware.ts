@@ -1,6 +1,7 @@
-// src/middleware.ts (FIXED - CHECK ALL AUTH COOKIES)
+// src/middleware.ts (Fixed Domain Matching)
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getSiteByDomain } from '@/lib/supabase/tenant-client'
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -9,51 +10,64 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  // Check for session using cookies (Edge Runtime compatible)
+  // === SITE DETECTION (FIXED) ===
+  const hostname = request.headers.get('host') || ''
+  
+  // DON'T remove port for localhost - keep full hostname
+  const searchDomain = hostname.replace(/^www\./, '') // Only remove www, keep port
+  
+  let siteConfig = null
+  
+  try {
+    siteConfig = await getSiteByDomain(searchDomain)
+  } catch (error) {
+  }
+
+  if (siteConfig) {
+    // Add site context to response headers
+    response.headers.set('x-site-id', siteConfig.id)
+    response.headers.set('x-site-config', JSON.stringify(siteConfig))
+    response.headers.set('x-site-domain', siteConfig.domain)
+  } else {
+  }
+
+  // === YOUR EXISTING AUTH LOGIC (UNCHANGED) ===
   const allCookies = request.cookies.getAll()
   const supabaseAuthCookies = allCookies.filter(cookie => 
     cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token')
   )
   
-  // Parse session from any valid cookie
   let session = null
   let userId = null
   
-  // Check all auth cookies and find a valid one
   for (const authCookie of supabaseAuthCookies) {
     try {
       const cookieValue = decodeURIComponent(authCookie.value)
       let authData
       
-      // Handle different cookie formats
       if (cookieValue.startsWith('[')) {
-        // Array format: ["jwt_token", "refresh_token", ...]
         authData = JSON.parse(cookieValue)
         if (authData[0]) {
           const jwt = authData[0]
           const payload = JSON.parse(atob(jwt.split('.')[1]))
-          // Check if token is still valid (not expired)
           if (payload.exp > Date.now() / 1000) {
             session = { user: { id: payload.sub } }
             userId = payload.sub
-            break // Found valid session, stop checking
+            break
           }
         }
       } else if (cookieValue.startsWith('{')) {
-        // Object format: {"access_token": "...", "user": {...}}
         authData = JSON.parse(cookieValue)
         if (authData.access_token && authData.user) {
-          // For object format, also check if token is valid
           try {
             const jwt = authData.access_token
             const payload = JSON.parse(atob(jwt.split('.')[1]))
             if (payload.exp > Date.now() / 1000) {
               session = { user: { id: authData.user.id } }
               userId = authData.user.id
-              break // Found valid session, stop checking
+              break
             }
           } catch {
-            // If JWT parsing fails, assume it's valid for object format
             session = { user: { id: authData.user.id } }
             userId = authData.user.id
             break
@@ -61,12 +75,10 @@ export async function middleware(request: NextRequest) {
         }
       }
     } catch (error) {
-      // If parsing fails, continue to next cookie
       continue
     }
   }
 
-  // Your existing auth logic (keeping exactly as is)
   if (session && isAuthRoute(request.nextUrl.pathname)) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
@@ -106,5 +118,8 @@ export const config = {
     '/register',
     '/auth/:path*',
     '/forgot-password',
+    '/', // Add homepage to get site context
+    '/search',
+    '/categories/:path*',
   ],
 }
