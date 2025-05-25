@@ -1,8 +1,12 @@
+
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from 'next/server'
-import { emailService } from '@/lib/email/service'
 
 export async function POST() {
   try {
+    const { emailService } = await import('@/lib/email/service')
+
     emailService.startEmailProcessor(30000) // Process every 30 seconds
     
     return NextResponse.json({

@@ -1,0 +1,13 @@
+src/app/api/messages/route.ts
+src/app/api/auth/callback/route.ts
+src/app/api/crm/integration/sync-directory-data/route.ts
+src/app/api/crm/integration/auto-contact/route.ts
+src/app/api/start-processor/route.ts
+src/app/api/email/processor/route.ts
+src/app/api/email/manager/route.ts
+src/app/api/email/queue/stats/route.ts
+src/app/api/email/queue/process/route.ts
+src/app/api/email/templates/route.ts
+src/app/api/email/webhooks/resend/route.ts
+src/app/api/email/send/route.ts
+src/app/startup/route.ts

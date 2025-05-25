@@ -1,9 +1,13 @@
 // src/app/api/email/processor/route.ts
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
-import { emailService } from '@/lib/email/service'
 
 export async function POST(request: NextRequest) {
   try {
+    // Dynamic import - only loads at runtime when function is called
+    const { emailService } = await import('@/lib/email/service')
+    
     const { action } = await request.json()
     
     if (action === 'start') {
@@ -42,6 +46,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
+    // Dynamic import here too
+    const { emailService } = await import('@/lib/email/service')
+    
     const stats = await emailService.getEmailStats()
     
     return NextResponse.json({

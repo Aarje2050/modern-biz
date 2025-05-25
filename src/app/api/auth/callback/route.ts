@@ -2,7 +2,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
-import { AuthEmailIntegrations } from '@/lib/email/integrations/auth'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
@@ -50,9 +49,10 @@ export async function GET(request: NextRequest) {
         .update({ is_verified: true })
         .eq('id', user.id)
       
-      // Send welcome email for new users
+      // Send welcome email for new users - using dynamic import to avoid build issues
       if (isNewUser) {
         try {
+          const { AuthEmailIntegrations } = await import('@/lib/email/integrations/auth')
           await AuthEmailIntegrations.sendWelcomeEmail(user.id)
           console.log(`Welcome email sent to user: ${user.id}`)
         } catch (emailError) {

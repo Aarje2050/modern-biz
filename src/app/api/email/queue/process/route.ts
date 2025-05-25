@@ -1,10 +1,13 @@
 // src/app/api/email/queue/process/route.ts
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { emailService } from '@/lib/email/service'
+
 
 export async function POST(request: NextRequest) {
   try {
+    const { createClient } = await import('@/lib/supabase/server')
+    const { emailService } = await import('@/lib/email/service')
     const supabase = await createClient()
     const { data: { session } } = await supabase.auth.getSession()
 

@@ -1,9 +1,7 @@
 // src/app/api/crm/integration/sync-directory-data/route.ts
-// REPLACE YOUR ENTIRE FILE WITH THIS PERMANENT SOLUTION
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'         // For auth verification
-import { createServiceClient } from '@/lib/supabase/service'  // For data operations
 
 // Simple function to get real user data using SERVICE ROLE
 async function getUserDataWithServiceRole(serviceSupabase: any, profileId: string) {
@@ -46,6 +44,10 @@ async function getUserDataWithServiceRole(serviceSupabase: any, profileId: strin
 
 export async function POST(request: NextRequest) {
   try {
+    // Dynamic imports - only load at runtime
+    const { createClient } = await import('@/lib/supabase/server')
+    const { createServiceClient } = await import('@/lib/supabase/service')
+    
     // Use regular client for auth verification
     const authSupabase = createClient()
     const { data: { user }, error: authError } = await authSupabase.auth.getUser()
