@@ -1,9 +1,15 @@
 // src/app/api/email/webhooks/resend/route.ts
+export const dynamic = 'force-dynamic'
+
+
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/service'
 
 export async function POST(request: NextRequest) {
   try {
+    const { createServiceClient } = await import('@/lib/supabase/service')
+
+
+
     const webhookSecret = process.env.RESEND_WEBHOOK_SECRET
     
     // Verify webhook signature if secret is configured
