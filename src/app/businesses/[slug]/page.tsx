@@ -10,6 +10,130 @@ import dynamic from 'next/dynamic';
 import BusinessAssistant from '@/components/chat/business-assistant'
 import BusinessActions from '@/components/businesses/business-actions'
 
+// Business Hours Utility Functions
+function formatTime(time: string): string {
+  const [hours, minutes] = time.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${displayHour}:${minutes} ${ampm}`;
+}
+
+function getDayName(day: string): string {
+  const dayMap: Record<string, string> = {
+    'mon': 'Monday',
+    'tue': 'Tuesday', 
+    'wed': 'Wednesday',
+    'thu': 'Thursday',
+    'fri': 'Friday',
+    'sat': 'Saturday',
+    'sun': 'Sunday'
+  };
+  return dayMap[day] || day;
+}
+
+function getCurrentDayAbbr(): string {
+  const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  return days[new Date().getDay()];
+}
+
+function isCurrentlyOpen(businessHours: any): { isOpen: boolean; nextChange: string | null } {
+  if (!businessHours || !Array.isArray(businessHours)) {
+    return { isOpen: false, nextChange: null };
+  }
+
+  const now = new Date();
+  const currentDay = getCurrentDayAbbr();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  const todayHours = businessHours.find(schedule => 
+    schedule.days && schedule.days.includes(currentDay)
+  );
+
+  if (!todayHours || todayHours.status === 'closed' || !todayHours.hours || todayHours.hours.length === 0) {
+    return { isOpen: false, nextChange: 'Opens tomorrow' };
+  }
+
+  for (const timeSlot of todayHours.hours) {
+    if (timeSlot.from && timeSlot.to) {
+      const [fromHour, fromMin] = timeSlot.from.split(':').map(Number);
+      const [toHour, toMin] = timeSlot.to.split(':').map(Number);
+      
+      const openTime = fromHour * 60 + fromMin;
+      const closeTime = toHour * 60 + toMin;
+      
+      if (currentTime >= openTime && currentTime < closeTime) {
+        return { isOpen: true, nextChange: `Closes at ${formatTime(timeSlot.to)}` };
+      }
+    }
+  }
+
+  return { isOpen: false, nextChange: 'Closed today' };
+}
+
+// Business Hours Component
+function BusinessHours({ businessHours }: { businessHours: any }) {
+  if (!businessHours || !Array.isArray(businessHours)) {
+    return (
+      <div className="text-center py-6 text-slate-500">
+        <p className="text-sm">Hours not available</p>
+      </div>
+    );
+  }
+
+  const { isOpen, nextChange } = isCurrentlyOpen(businessHours);
+  const groupedHours: Array<{ days: string[]; hours: any[]; status: string }> = [];
+  
+  for (const schedule of businessHours) {
+    if (schedule.days && Array.isArray(schedule.days)) {
+      groupedHours.push(schedule);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className={`flex items-center justify-center p-3 rounded-lg ${
+        isOpen 
+          ? 'bg-emerald-50 border border-emerald-200' 
+          : 'bg-red-50 border border-red-200'
+      }`}>
+        <div className={`flex items-center ${isOpen ? 'text-emerald-700' : 'text-red-700'}`}>
+          <div className={`w-2 h-2 rounded-full mr-2 ${isOpen ? 'bg-emerald-500' : 'bg-red-500'}`} />
+          <span className="font-medium">
+            {isOpen ? 'Open Now' : 'Closed'}
+          </span>
+          {nextChange && (
+            <span className="text-sm ml-2 opacity-75">• {nextChange}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {groupedHours.map((schedule, index) => {
+          const dayNames = schedule.days.map(getDayName);
+          const dayRange = dayNames.length > 2 ? `${dayNames[0]} - ${dayNames[dayNames.length - 1]}` : dayNames.join(', ');
+
+          return (
+            <div key={index} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
+              <span className="text-slate-700 font-medium text-sm">{dayRange}</span>
+              <span className="text-slate-600 text-sm">
+                {schedule.status === 'closed' || !schedule.hours || schedule.hours.length === 0 
+                  ? 'Closed'
+                  : schedule.hours.map((timeSlot: any) => (
+                      timeSlot.from && timeSlot.to 
+                        ? `${formatTime(timeSlot.from)} - ${formatTime(timeSlot.to)}`
+                        : 'Closed'
+                    )).join(', ')
+                }
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const ReviewList = dynamic(() => import('@/components/reviews/review-list'), {
   loading: () => <div className="animate-pulse space-y-4">
     <div className="h-4 bg-gray-200 rounded w-3/4"></div>
@@ -537,9 +661,7 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
               <h3 className="text-lg font-bold text-slate-900 mb-6">Business Hours</h3>
               {primaryLocation?.business_hours ? (
-                <div>
-                  <p className="text-slate-600">Hours information available</p>
-                </div>
+                <BusinessHours businessHours={primaryLocation.business_hours} />
               ) : (
                 <div className="text-center py-6 text-slate-500">
                   <svg className="mx-auto h-8 w-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -554,10 +676,10 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
               <h3 className="text-lg font-bold text-slate-900 mb-6">Business Details</h3>
               <div className="space-y-4 text-sm">
-                <div className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
+                {/* <div className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
                   <span className="text-slate-600">Listed by</span>
                   <span className="font-medium">{profile?.full_name || 'Business Owner'}</span>
-                </div>
+                </div> */}
                 <div className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
                   <span className="text-slate-600">Listed on</span>
                   <span className="font-medium">{formatDate(business.created_at)}</span>
