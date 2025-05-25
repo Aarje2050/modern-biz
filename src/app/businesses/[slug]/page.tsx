@@ -554,10 +554,10 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
               <h3 className="text-lg font-bold text-slate-900 mb-6">Business Details</h3>
               <div className="space-y-4 text-sm">
-                <div className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
+                {/* <div className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
                   <span className="text-slate-600">Listed by</span>
                   <span className="font-medium">{profile?.full_name || 'Business Owner'}</span>
-                </div>
+                </div> */}
                 <div className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
                   <span className="text-slate-600">Listed on</span>
                   <span className="font-medium">{formatDate(business.created_at)}</span>
