@@ -43,4 +43,6 @@ next-env.d.ts
 #temp file 
 
 /temp.txt
+
 /notifications_schema.txt
+/delete.txt
