@@ -8,6 +8,8 @@ import AuthProvider from '@/providers/auth-provider'
 import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
 import { track } from '@/lib/analytics'
+import EmailProcessorStarter from '@/components/email-processor-starter'
+
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -34,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className}>
         <AuthProvider>
           <SimpleTracker />
+          <EmailProcessorStarter />
           <div className="flex flex-col min-h-screen">
             <Header />
             <main className="flex-grow">{children}</main>
