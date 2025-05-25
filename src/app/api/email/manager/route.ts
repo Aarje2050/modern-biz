@@ -1,10 +1,14 @@
 // src/app/api/email/manager/route.ts
+// ONLY CHANGED: Static imports to dynamic imports
+
 import { NextRequest, NextResponse } from 'next/server'
-import { emailProcessorManager } from '@/lib/email/auto-processor'
-import { emailService } from '@/lib/email/service'
 
 export async function POST(request: NextRequest) {
   try {
+    // ONLY CHANGE: Dynamic imports instead of static imports
+    const { emailProcessorManager } = await import('@/lib/email/auto-processor')
+    const { emailService } = await import('@/lib/email/service')
+    
     const { action } = await request.json()
 
     switch (action) {
@@ -62,6 +66,10 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
+    // ONLY CHANGE: Dynamic imports instead of static imports
+    const { emailProcessorManager } = await import('@/lib/email/auto-processor')
+    const { emailService } = await import('@/lib/email/service')
+    
     const status = emailProcessorManager.getStatus()
     const stats = await emailService.getEmailStats()
     

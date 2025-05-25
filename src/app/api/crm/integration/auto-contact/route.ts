@@ -1,8 +1,7 @@
 // src/app/api/crm/integration/auto-contact/route.ts
-// REPLACE YOUR EXISTING AUTO-CONTACT ROUTE
+// ONLY CHANGED: Static import to dynamic import
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/service'
 
 // Simple function to get real user data using SERVICE ROLE
 async function getUserDataWithServiceRole(serviceSupabase: any, profileId: string) {
@@ -41,7 +40,10 @@ async function getUserDataWithServiceRole(serviceSupabase: any, profileId: strin
 
 export async function POST(request: NextRequest) {
   try {
+    // ONLY CHANGE: Dynamic import instead of static import
+    const { createServiceClient } = await import('@/lib/supabase/service')
     const serviceSupabase = createServiceClient()
+    
     const { business_id, profile_id, rating, title, content } = await request.json()
 
     if (!business_id || !profile_id) {
