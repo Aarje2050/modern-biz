@@ -1,5 +1,7 @@
 // src/app/api/crm/integration/sync-directory-data/route.ts
 // REPLACE YOUR ENTIRE FILE WITH THIS PERMANENT SOLUTION
+export const dynamic = 'force-dynamic'
+
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'         // For auth verification

@@ -1,4 +1,6 @@
 // src/app/api/email/processor/route.ts
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { emailService } from '@/lib/email/service'
 
