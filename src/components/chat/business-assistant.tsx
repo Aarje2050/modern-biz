@@ -115,8 +115,8 @@ export default function BusinessAssistant({ business }: BusinessAssistantProps) 
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 bg-blue-600 text-white rounded-full p-4 shadow-lg hover:bg-blue-700 transition-all z-40 animate-bounce-subtle"
-        >
+          className="fixed bottom-6 right-6 bg-blue-600 text-white rounded-full p-4 mb-20 md:mb-0 shadow-lg hover:bg-blue-700 transition-all z-40 animate-bounce-subtle"
+          >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
           </svg>
@@ -125,7 +125,7 @@ export default function BusinessAssistant({ business }: BusinessAssistantProps) 
       
       {/* Chat window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 w-80 md:w-96 bg-white rounded-lg shadow-xl z-50 flex flex-col max-h-[500px] border border-gray-200">
+        <div className="fixed bottom-6 right-6 w-80 md:w-96 bg-white rounded-lg mb-[4.55rem] md:mb-0 shadow-xl z-50 flex flex-col max-h-[500px] border border-gray-200">
           {/* Chat header */}
           <div className="flex items-center justify-between bg-blue-600 text-white p-4 rounded-t-lg">
             <div className="flex items-center">

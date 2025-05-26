@@ -1,9 +1,10 @@
-// src/app/page.tsx (Simple Working Version)
+// src/app/page.tsx (Mobile App-Style Responsive)
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentSite } from '@/lib/site-context'
 import { headers } from 'next/headers'
+import SearchInput from '@/components/search/search-input'
 import type { Metadata } from 'next'
 
 interface Business {
@@ -21,11 +22,6 @@ interface Category {
   slug: string
   icon?: string | null
 }
-
-
-  
-
-import SearchInput from '@/components/search/search-input'
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteConfig = getCurrentSite()
@@ -94,7 +90,6 @@ function getNicheContent(niche: string, location: string) {
 export default async function Home() {
   const siteConfig = getCurrentSite()
   
-  
   if (!siteConfig) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -110,29 +105,23 @@ export default async function Home() {
   const location = siteConfig.config?.location || ''
   const content = getNicheContent(niche, location)
   
- 
-  
-  // Use standard Supabase client with explicit site filtering
   const supabase = createClient()
   
   // Get categories for this site only
-  const { data: topCategories, error: categoriesError } = await supabase
+  const { data: topCategories } = await supabase
     .from('categories')
     .select('id, name, slug, icon')
     .eq('site_id', siteConfig.id)
     .limit(8)
   
-
-  
   // Get recent businesses for this site only
-  const { data: recentBusinesses, error: businessesError } = await supabase
+  const { data: recentBusinesses } = await supabase
     .from('businesses')
     .select('id, name, slug, short_description, logo_url, site_id')
     .eq('site_id', siteConfig.id)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
     .limit(4)
-  
   
   // Get total count for this site only
   const { count: totalBusinesses } = await supabase
@@ -141,35 +130,48 @@ export default async function Home() {
     .eq('site_id', siteConfig.id)
     .eq('status', 'active')
 
-
   return (
-    <div className="min-h-screen bg-white">
-
-      {/* Clean Hero Section */}
-      <section className="bg-gradient-to-b from-red-600 to-red-700 text-white">
-        <div className="container mx-auto px-4 py-16">
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile App-Style Hero Section */}
+      <section className="bg-gradient-to-br from-red-600 via-red-600 to-red-700 text-white relative overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 bg-black bg-opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }}></div>
+        </div>
+        
+        <div className="relative container mx-auto px-4 py-8 md:py-16">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-5xl font-bold mb-4">
+            {/* Mobile-First Typography */}
+            <h1 className="text-2xl md:text-5xl font-bold mb-3 md:mb-6 leading-tight">
               {content.title}
               {location && (
-                <span className="block text-3xl font-normal mt-2 text-red-100">
+                <span className="block text-lg md:text-3xl font-normal mt-1 md:mt-2 text-red-100 opacity-90">
                   in {location.charAt(0).toUpperCase() + location.slice(1)}
                 </span>
               )}
             </h1>
-            <p className="text-xl mb-8 text-red-100">{content.subtitle}</p>
             
-            <div className="max-w-2xl mx-auto mb-8">
-              <SearchInput placeholder={content.placeholder} />
+            <p className="text-sm md:text-xl mb-6 md:mb-8 text-red-100 leading-relaxed px-2">
+              {content.subtitle}
+            </p>
+            
+            {/* Mobile-Optimized Search */}
+            <div className="mb-6 md:mb-8 px-2">
+              <SearchInput 
+                placeholder={content.placeholder}
+                className="w-full max-w-2xl mx-auto"
+              />
             </div>
 
-            {/* Popular Services */}
-            <div className="flex flex-wrap justify-center gap-3">
+            {/* Mobile-Friendly Popular Services */}
+            <div className="flex flex-wrap justify-center gap-2 md:gap-3 px-2">
               {content.popular.map((service: string, index: number) => (
                 <Link
                   key={index}
                   href={`/search?q=${encodeURIComponent(service)}`}
-                  className="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-full text-sm font-medium transition-all"
+                  className="bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all backdrop-blur-sm"
                 >
                   {service}
                 </Link>
@@ -179,91 +181,132 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Stats Bar */}
-      <section className="bg-gray-50 py-6 border-b">
+      {/* Mobile App-Style Stats */}
+      <section className="py-4 md:py-6 bg-white shadow-sm">
         <div className="container mx-auto px-4">
-          <div className="flex justify-center items-center space-x-8 text-center">
-            <div>
-              <div className="text-2xl font-bold text-gray-900">{totalBusinesses || 0}</div>
-              <div className="text-sm text-gray-600">Local {niche} services</div>
+          <div className="flex justify-center items-center space-x-6 md:space-x-8 text-center">
+            <div className="flex flex-col">
+              <div className="text-lg md:text-2xl font-bold text-gray-900">{totalBusinesses || 0}</div>
+              <div className="text-xs md:text-sm text-gray-600">Local Services</div>
             </div>
             <div className="h-8 w-px bg-gray-300"></div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">100%</div>
-              <div className="text-sm text-gray-600">Verified listings</div>
+            <div className="flex flex-col">
+              <div className="text-lg md:text-2xl font-bold text-gray-900">100%</div>
+              <div className="text-xs md:text-sm text-gray-600">Verified</div>
             </div>
             <div className="h-8 w-px bg-gray-300"></div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">24/7</div>
-              <div className="text-sm text-gray-600">Customer support</div>
+            <div className="flex flex-col">
+              <div className="text-lg md:text-2xl font-bold text-gray-900">24/7</div>
+              <div className="text-xs md:text-sm text-gray-600">Support</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Categories Grid */}
-      <section className="py-16">
+      {/* Mobile App-Style Categories */}
+      <section className="py-6 md:py-12 bg-white">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">Browse {niche.charAt(0).toUpperCase() + niche.slice(1)} Categories</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
-            {topCategories && topCategories.length > 0 ? (
-              topCategories.map((category: Category) => (
+          <div className="flex items-center justify-between mb-4 md:mb-8">
+            <h2 className="text-lg md:text-2xl font-bold text-gray-900">
+              Browse Categories
+            </h2>
+            <Link
+              href="/categories"
+              className="text-sm text-red-600 hover:text-red-700 font-medium"
+            >
+              View All
+            </Link>
+          </div>
+          
+          {topCategories && topCategories.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+              {topCategories.slice(0, 8).map((category: Category) => (
                 <Link
                   key={category.id}
                   href={`/categories/${category.slug}`}
-                  className="group p-6 bg-white border rounded-lg hover:shadow-md transition-shadow text-center"
+                  className="group bg-gray-50 hover:bg-red-50 rounded-xl p-4 md:p-6 text-center transition-all duration-200 border border-transparent hover:border-red-100"
                 >
-                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:bg-red-50">
-                    <svg className="w-6 h-6 text-gray-600 group-hover:text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-white group-hover:bg-red-100 rounded-full flex items-center justify-center mx-auto mb-2 md:mb-3 shadow-sm transition-colors">
+                    <svg className="w-5 h-5 md:w-6 md:h-6 text-gray-600 group-hover:text-red-600 transition-colors" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <h3 className="font-semibold text-gray-900 group-hover:text-red-600">{category.name}</h3>
+                  <h3 className="text-sm md:text-base font-semibold text-gray-900 group-hover:text-red-600 transition-colors leading-tight">
+                    {category.name}
+                  </h3>
                 </Link>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-8">
-                <p className="text-gray-500">No categories found for this site.</p>
-                <Link href="/businesses/add" className="text-blue-600 hover:underline mt-2 inline-block">
-                  Add the first business
-                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 md:py-12">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
               </div>
-            )}
-          </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No categories yet</h3>
+              <p className="text-gray-600 mb-4">Add the first business to create categories</p>
+              <Link
+                href="/businesses/add"
+                className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+              >
+                Add Business
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Recent Businesses */}
+      {/* Mobile App-Style Recent Services */}
       {recentBusinesses && recentBusinesses.length > 0 && (
-        <section className="py-16 bg-gray-50">
+        <section className="py-6 md:py-12 bg-gray-50">
           <div className="container mx-auto px-4">
-            <h2 className="text-3xl font-bold text-center mb-12">Recently Added {niche.charAt(0).toUpperCase() + niche.slice(1)} Services</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+            <div className="flex items-center justify-between mb-4 md:mb-8">
+              <h2 className="text-lg md:text-2xl font-bold text-gray-900">
+                Recent Services
+              </h2>
+              <Link
+                href="/businesses"
+                className="text-sm text-red-600 hover:text-red-700 font-medium"
+              >
+                View All
+              </Link>
+            </div>
+            
+            <div className="space-y-3 md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-6 md:space-y-0">
               {recentBusinesses.map((business: Business) => (
                 <Link
                   key={business.id}
                   href={`/businesses/${business.slug}`}
-                  className="bg-white rounded-lg border hover:shadow-md transition-shadow overflow-hidden"
+                  className="block bg-white rounded-lg border hover:shadow-md transition-all duration-200 overflow-hidden"
                 >
-                  <div className="h-32 bg-gray-200 relative">
-                    {business.logo_url ? (
-                      <Image
-                        src={business.logo_url}
-                        alt={business.name}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-lg font-bold">
-                        {business.name.substring(0, 2).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 mb-1 truncate">{business.name}</h3>
-                    <p className="text-sm text-gray-600 line-clamp-2">
-                      {business.short_description || 'Professional service provider'}
-                    </p>
+                  {/* Mobile: Horizontal Layout, Desktop: Vertical */}
+                  <div className="flex md:block">
+                    {/* Logo */}
+                    <div className="w-16 h-16 md:w-full md:h-32 bg-gray-200 relative flex-shrink-0">
+                      {business.logo_url ? (
+                        <Image
+                          src={business.logo_url}
+                          alt={business.name}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm md:text-lg font-bold">
+                          {business.name.substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 p-3 md:p-4">
+                      <h3 className="font-semibold text-gray-900 mb-1 text-sm md:text-base line-clamp-1">
+                        {business.name}
+                      </h3>
+                      <p className="text-xs md:text-sm text-gray-600 line-clamp-2">
+                        {business.short_description || 'Professional service provider'}
+                      </p>
+                    </div>
                   </div>
                 </Link>
               ))}
@@ -272,16 +315,50 @@ export default async function Home() {
         </section>
       )}
 
-      {/* Simple CTA */}
-      <section className="py-16 bg-gray-900 text-white">
+      {/* Mobile App-Style Benefits */}
+      <section className="py-6 md:py-12 bg-white">
+        <div className="container mx-auto px-4">
+          <h2 className="text-lg md:text-2xl font-bold text-center mb-6 md:mb-8 text-gray-900">
+            Why Choose {siteConfig.name}?
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {[
+              { icon: '🔍', title: 'Easy Search', desc: 'Find services quickly' },
+              { icon: '⭐', title: 'Verified Reviews', desc: 'Real customer feedback' },
+              { icon: '📞', title: 'Direct Contact', desc: 'Connect instantly' },
+              { icon: '🚀', title: 'Fast Service', desc: 'Quick responses' }
+            ].map((benefit, index) => (
+              <div key={index} className="text-center">
+                <div className="text-2xl md:text-3xl mb-2 md:mb-3">{benefit.icon}</div>
+                <h3 className="font-semibold text-gray-900 mb-1 text-sm md:text-base">
+                  {benefit.title}
+                </h3>
+                <p className="text-xs md:text-sm text-gray-600">
+                  {benefit.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Mobile App-Style CTA */}
+      <section className="py-8 md:py-16 bg-gradient-to-r from-gray-900 to-gray-800 text-white">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-4">List Your {niche.charAt(0).toUpperCase() + niche.slice(1)} Business</h2>
-          <p className="text-gray-300 mb-8">Join {siteConfig.name} and connect with customers</p>
+          <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4">
+            List Your {niche.charAt(0).toUpperCase() + niche.slice(1)} Business
+          </h2>
+          <p className="text-sm md:text-lg text-gray-300 mb-6 md:mb-8 max-w-2xl mx-auto">
+            Join {siteConfig.name} and connect with customers{location ? ` in ${location}` : ''}
+          </p>
           <Link
             href="/businesses/add"
-            className="inline-block bg-red-600 hover:bg-red-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors"
+            className="inline-flex items-center px-6 py-3 md:px-8 md:py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors text-sm md:text-base"
           >
             Get Started Today
+            <svg className="w-4 h-4 md:w-5 md:h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </Link>
         </div>
       </section>
