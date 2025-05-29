@@ -1,15 +1,19 @@
-// src/app/layout.tsx (Mobile App-Style Layout)
+// src/app/layout.tsx (EMERGENCY FIX - Simplified)
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { Metadata } from 'next'
+// TEMPORARILY REMOVED: SiteAwareLayout and SiteAwareAuthProvider
+import AuthProvider from '@/providers/auth-provider'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
-import AuthProvider from '@/providers/auth-provider'
-import ClientLayout from './client-layout'
+import SiteAwareLayout from '@/components/layout/SiteAwareLayout'
+import {SiteAwareAuthProvider} from '@/providers/SiteAwareAuthProvider'
+
+
+
 
 const inter = Inter({ subsets: ['latin'] })
 
-// Move metadata generation to a separate function
 export async function generateMetadata(): Promise<Metadata> {
   return {
     title: {
@@ -55,20 +59,24 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body className={`${inter.className} bg-gray-50`}>
+      
         <AuthProvider>
-          <ClientLayout>
-            <div className="flex flex-col min-h-screen">
-              <Header />
-              <main className="flex-grow pb-16 md:pb-0">
-                {children}
-              </main>
-              {/* Footer - hidden on mobile, shown on desktop */}
-              <div className="hidden md:block">
-                <Footer />
-              </div>
-            </div>
-          </ClientLayout>
+        <SiteAwareAuthProvider>
+
+        <SiteAwareLayout>
+        
+        
+          {/* SIMPLIFIED: No site-aware wrappers for now */}
+          <div className="flex flex-col min-h-screen">
+            <main className="flex-grow">
+              {children}
+            </main>
+          </div>
+          
+          </SiteAwareLayout>
+          </SiteAwareAuthProvider>
         </AuthProvider>
+        
       </body>
     </html>
   )

@@ -1,11 +1,11 @@
-// src/app/page.tsx (Mobile App-Style Responsive)
+// src/app/page.tsx (FIXED - Template-aware with server components)
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentSite } from '@/lib/site-context'
-import { headers } from 'next/headers'
 import SearchInput from '@/components/search/search-input'
 import type { Metadata } from 'next'
+import TemplatePageServer from '@/components/template/TemplatePageServer'
 
 interface Business {
   id: string
@@ -37,6 +37,24 @@ export async function generateMetadata(): Promise<Metadata> {
   const niche = config?.niche || 'business'
   const location = config?.location || ''
   
+  // Dynamic metadata based on site type
+  if (siteConfig.site_type === 'landing') {
+    return {
+      title: `${siteConfig.name} - ${niche} Services`,
+      description: `Get premium ${niche} services. Transform your business today.`,
+      keywords: `${niche}, services, premium, business`,
+    }
+  }
+  
+  if (siteConfig.site_type === 'service') {
+    return {
+      title: `${siteConfig.name} - Professional ${niche} Services${location ? ` in ${location}` : ''}`,
+      description: `Trusted ${niche} experts${location ? ` serving ${location}` : ''}. Licensed, insured, and committed to excellence.`,
+      keywords: `${niche}, ${location}, professional, licensed, insured`,
+    }
+  }
+  
+  // Default directory metadata
   const title = `${siteConfig.name} - Find Top ${niche.charAt(0).toUpperCase() + niche.slice(1)} Services${location ? ` in ${location.charAt(0).toUpperCase() + location.slice(1)}` : ''}`
   const description = `Discover top-rated ${niche} services${location ? ` in ${location}` : ''}. Read reviews, compare prices, and book online.`
 
@@ -87,7 +105,8 @@ function getNicheContent(niche: string, location: string) {
   }
 }
 
-export default async function Home() {
+// Keep your existing directory homepage as a separate component (SERVER COMPONENT)
+async function DirectoryHomePage() {
   const siteConfig = getCurrentSite()
   
   if (!siteConfig) {
@@ -364,4 +383,17 @@ export default async function Home() {
       </section>
     </div>
   )
+}
+
+// Template-aware homepage (SERVER COMPONENT)
+export default async function HomePage() {
+  const siteConfig = getCurrentSite()
+  
+  // For directory sites or no site config, use the directory homepage
+  if (!siteConfig || siteConfig.site_type === 'directory' || siteConfig.template === 'directory-modern') {
+    return <DirectoryHomePage />
+  }
+  
+  // For other site types, use the template system (client-side)
+  return <TemplatePageServer siteConfig={siteConfig} fallback={<DirectoryHomePage />} />
 }

@@ -1,10 +1,24 @@
-// src/app/api/site/current/route.ts
+// src/app/api/site/current/route.ts (ENTERPRISE GRADE)
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentSite } from '@/lib/site-context'
+import { getSiteByDomain } from '@/lib/supabase/tenant-client'
 
 export async function GET(request: NextRequest) {
   try {
-    const siteConfig = getCurrentSite()
+    // Get domain from request headers (same logic as middleware)
+    const hostname = request.headers.get('host') || ''
+    const searchDomain = hostname.replace(/^www\./, '')
+    
+    console.log('🔍 API site/current checking domain:', searchDomain)
+    
+    if (!searchDomain) {
+      return NextResponse.json(
+        { error: 'No domain found' }, 
+        { status: 400 }
+      )
+    }
+
+    // Do the same site lookup as middleware
+    const siteConfig = await getSiteByDomain(searchDomain)
     
     if (!siteConfig) {
       return NextResponse.json(
@@ -13,13 +27,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
+  
+
     return NextResponse.json(siteConfig)
+    
   } catch (error) {
-    console.error('Error getting current site:', error)
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
     )
   }
 }
-

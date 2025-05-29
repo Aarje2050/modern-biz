@@ -1,4 +1,4 @@
-// src/app/api/admin/bulk-assign/route.ts
+// CORRECTED: Uses account_type instead of is_admin
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
@@ -9,6 +9,23 @@ export async function POST(request: NextRequest) {
 
     if (!siteId || !type) {
       return NextResponse.json({ error: 'siteId and type required' }, { status: 400 })
+    }
+
+    // Verify admin permissions (CORRECTED)
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('account_type')
+      .eq('id', user.id)
+      .single()
+    
+    if (profile?.account_type !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
     let totalUpdated = 0

@@ -1,29 +1,27 @@
-// src/lib/site-context.ts
+// src/lib/site-context.ts (MASTER INTERFACE - FIXED)
 import { headers } from 'next/headers'
-import { createTenantClient } from './supabase/tenant-client'
 
+// MASTER SiteConfig interface (matches database schema)
 export interface SiteConfig {
   id: string
   domain: string
   name: string
   slug: string
+  site_type: 'directory' | 'landing' | 'service' | 'static'  // ADDED
+  template: string  // ADDED
   config: {
-    niche: string
-    location: string
-    theme: {
+    niche?: string
+    location?: string
+    theme?: {
       primaryColor: string
       secondaryColor: string
     }
-    seo: {
+    seo?: {
       defaultTitle: string
       defaultDescription: string
       keywords: string[]
     }
-    features: {
-      reviews: boolean
-      messaging: boolean
-      analytics: boolean
-    }
+    features?: Record<string, boolean>
   }
   status: string
   created_at: string
@@ -39,7 +37,15 @@ export function getCurrentSite(): SiteConfig | null {
     
     if (!siteConfigHeader || !siteId) return null
     
-    return JSON.parse(siteConfigHeader)
+    const siteConfig = JSON.parse(siteConfigHeader) as SiteConfig
+    
+    // Validate required fields
+    if (!siteConfig.id || !siteConfig.domain || !siteConfig.name) {
+      console.warn('Invalid site config:', siteConfig)
+      return null
+    }
+    
+    return siteConfig
   } catch (error) {
     console.error('Error getting site context:', error)
     return null
@@ -49,6 +55,8 @@ export function getCurrentSite(): SiteConfig | null {
 // Server-side: Get site-aware Supabase client
 export function getCurrentSiteClient() {
   const site = getCurrentSite()
+  // Note: Import moved to avoid circular dependency
+  const { createTenantClient } = require('./supabase/tenant-client')
   return createTenantClient(site?.id)
 }
 
@@ -61,5 +69,3 @@ export function getCurrentSiteId(): string | null {
     return null
   }
 }
-
-

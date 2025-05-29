@@ -1,4 +1,3 @@
-// src/app/api/sites/route.ts (Debug Version)
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
@@ -17,62 +16,54 @@ export async function GET() {
 
     return NextResponse.json(sites)
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Internal server error' }, 
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
-  console.log('=== POST SITES API CALLED ===')
-  
   try {
-    console.log('1. Creating supabase client...')
     const supabase = createClient()
-    
-    console.log('2. Parsing request body...')
     const body = await request.json()
-    console.log('Body received:', JSON.stringify(body, null, 2))
     
-    const { domain, name, config } = body
+    const { domain, name, site_type, template, config } = body
     
-    console.log('3. Validating inputs...')
     if (!domain || !name) {
-      console.log('Validation failed - missing domain or name')
       return NextResponse.json(
         { error: 'Domain and name are required' }, 
         { status: 400 }
       )
     }
 
-    console.log('4. Generating slug...')
+    // Generate slug from name
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-    console.log('Generated slug:', slug)
 
-    console.log('5. Checking user auth...')
+    // Verify admin permissions
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-    console.log('User:', user?.id)
-    console.log('Auth error:', authError)
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    console.log('6. Checking admin status...')
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from('profiles')
-      .select('is_admin')
-      .eq('id', user?.id)
+      .select('account_type')
+      .eq('id', user.id)
       .single()
     
-    console.log('Profile:', profile)
-    console.log('Profile error:', profileError)
+    if (profile?.account_type !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    }
 
-    console.log('7. Inserting site...')
+    // Insert site with new fields
     const insertData = {
       domain,
       name,
       slug,
-      config: config || {}
+      site_type: site_type || 'directory',
+      template: template || 'directory-modern',
+      config: config || {},
+      status: 'active'
     }
-    console.log('Insert data:', JSON.stringify(insertData, null, 2))
 
     const { data: site, error } = await supabase
       .from('sites')
@@ -80,31 +71,17 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    console.log('8. Insert result:')
-    console.log('Site data:', site)
-    console.log('Insert error:', error)
-
     if (error) {
       console.error('Database error:', error)
-      return NextResponse.json({ 
-        error: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code 
-      }, { status: 500 })
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('9. Success!')
     return NextResponse.json(site, { status: 201 })
     
   } catch (error) {
-    console.error('=== CRITICAL ERROR ===', error)
+    console.error('API error:', error)
     return NextResponse.json(
-      { 
-        error: 'Internal server error', 
-        message: (error as Error).message,
-        stack: (error as Error).stack 
-      }, 
+      { error: 'Internal server error: ' + (error as Error).message }, 
       { status: 500 }
     )
   }

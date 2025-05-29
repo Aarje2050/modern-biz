@@ -265,7 +265,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const location = siteConfig?.config?.location || ''
   
   const title = `${business.name}${category ? ` - ${category}` : ''}${location ? ` in ${location}` : ''} | ${siteName}`
-  const description = business.short_description || business.description || `Learn more about ${business.name}, a trusted local business.`
+  const description =  `Learn more about ${business.name}, a trusted local business.`
   
   return {
     title,

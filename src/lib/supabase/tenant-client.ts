@@ -2,6 +2,7 @@
 import { createClient as createBrowserClient } from './client'
 import { createClient as createServerClient } from './server'
 
+
 interface SiteConfig {
   id: string
   domain: string
@@ -106,22 +107,39 @@ export async function getSiteByDomain(domain: string): Promise<SiteConfig | null
   try {
     const client = createServerClient()
     
+    console.log('🔍 getSiteByDomain: Looking up domain:', domain)
     
     const { data, error } = await client
       .from('sites')
-      .select('*')
+      .select('id, domain, name, slug, site_type, template, config, status, created_at, updated_at')
       .eq('domain', domain)
       .single()
     
-    
     if (error) {
-      console.error('Site lookup error:', error)
+      if (error.code === 'PGRST116') {
+        console.log('❌ getSiteByDomain: No site found for domain:', domain)
+      } else {
+        console.error('❌ getSiteByDomain: Database error:', error)
+      }
       return null
     }
+
+    if (!data) {
+      console.log('❌ getSiteByDomain: No data returned for domain:', domain)
+      return null
+    }
+
+    console.log('✅ getSiteByDomain: Site found:', {
+      id: data.id,
+      name: data.name,
+      domain: data.domain,
+      site_type: data.site_type,
+      template: data.template
+    })
     
     return data as SiteConfig
   } catch (error) {
-    console.error('Site lookup exception:', error)
+    console.error('❌ getSiteByDomain: Exception:', error)
     return null
   }
 }
