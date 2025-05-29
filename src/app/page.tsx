@@ -81,7 +81,7 @@ async function DirectoryHomePage() {
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Site Not Found</h1>
-          <p className="text-gray-600">This domain is not configured in our system.</p>
+          <p className="text-gray-600">This domain is not configured in our system. Contact Rajesh</p>
         </div>
       </div>
     )
