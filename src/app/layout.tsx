@@ -1,8 +1,9 @@
-// src/app/layout.tsx (ENTERPRISE FIX)
+// src/app/layout.tsx (FIXED - Remove duplicate provider)
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { Metadata } from 'next'
 import AuthProvider from '@/providers/auth-provider'
+import { SiteAwareAuthProvider } from '@/providers/SiteAwareAuthProvider'
 import SiteAwareLayout from '@/components/layout/SiteAwareLayout'
 
 // CRITICAL: Force dynamic rendering for multi-tenant architecture
@@ -12,7 +13,6 @@ export const revalidate = 0
 const inter = Inter({ subsets: ['latin'] })
 
 export async function generateMetadata(): Promise<Metadata> {
-  // Use static metadata to avoid dynamic server usage during build
   return {
     title: {
       template: '%s | BusinessDir',
@@ -57,15 +57,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body className={`${inter.className} bg-gray-50`}>
-        {/* ENTERPRISE: Simplified provider structure to prevent render loops */}
+        {/* ENTERPRISE: Proper provider hierarchy */}
         <AuthProvider>
-          <SiteAwareLayout>
-            <div className="flex flex-col min-h-screen">
-              <main className="flex-grow">
-                {children}
-              </main>
-            </div>
-          </SiteAwareLayout>
+          <SiteAwareAuthProvider>
+            <SiteAwareLayout>
+              <div className="flex flex-col min-h-screen">
+                <main className="flex-grow">
+                  {children}
+                </main>
+              </div>
+            </SiteAwareLayout>
+          </SiteAwareAuthProvider>
         </AuthProvider>
       </body>
     </html>

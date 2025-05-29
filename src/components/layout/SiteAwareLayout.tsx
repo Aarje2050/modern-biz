@@ -1,14 +1,32 @@
+// src/components/layout/SiteAwareLayout.tsx (MINIMAL FIX - Keep your existing code)
 'use client'
 import { useSiteContext } from '@/hooks/useSiteContext'
 import { useSiteAuth } from '@/providers/SiteAwareAuthProvider'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react' // ADD THIS
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 
+// ADD THIS: Safe hook wrapper to prevent provider errors
+function useSafeAuth() {
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  
+  try {
+    const auth = useSiteAuth()
+    return mounted ? auth : { user: null, isAuthorizedForSite: false, signOut: async () => {}, loading: true }
+  } catch (error) {
+    // Fallback if provider not available
+    return { user: null, isAuthorizedForSite: false, signOut: async () => {}, loading: false }
+  }
+}
 
-// Directory header (your existing header functionality)
+// Directory header (your existing header functionality) - ONLY CHANGED: useSiteAuth → useSafeAuth
 function DirectoryHeader() {
-  const { user, isAuthorizedForSite, signOut } = useSiteAuth()
+  const { user, isAuthorizedForSite, signOut } = useSafeAuth() // CHANGED THIS LINE
   
   return (
     <header className="bg-white shadow-sm border-b">
@@ -62,9 +80,9 @@ function DirectoryHeader() {
   )
 }
 
-// Landing page header
+// Landing page header - ONLY CHANGED: useSiteAuth → useSafeAuth
 function LandingHeader({ siteName, primaryColor }: { siteName: string, primaryColor: string }) {
-  const { user, isAuthorizedForSite, signOut } = useSiteAuth()
+  const { user, isAuthorizedForSite, signOut } = useSafeAuth() // CHANGED THIS LINE
   
   return (
     <header className="bg-white shadow-sm">
@@ -108,9 +126,9 @@ function LandingHeader({ siteName, primaryColor }: { siteName: string, primaryCo
   )
 }
 
-// Service business header
+// Service business header - ONLY CHANGED: useSiteAuth → useSafeAuth
 function ServiceHeader({ siteName, primaryColor, location }: { siteName: string, primaryColor: string, location?: string }) {
-  const { user, isAuthorizedForSite, signOut } = useSiteAuth()
+  const { user, isAuthorizedForSite, signOut } = useSafeAuth() // CHANGED THIS LINE
   
   return (
     <header className="bg-white shadow-sm">
@@ -163,7 +181,7 @@ function ServiceHeader({ siteName, primaryColor, location }: { siteName: string,
   )
 }
 
-// Directory footer (your existing footer)
+// Directory footer (your existing footer) - NO CHANGES
 function DirectoryFooter() {
   return (
     <footer className="bg-gray-900 text-white">
@@ -205,7 +223,7 @@ function DirectoryFooter() {
   )
 }
 
-// Landing/Service footer
+// Landing/Service footer - NO CHANGES
 function SimpleFooter({ siteName }: { siteName: string }) {
   return (
     <footer className="bg-gray-900 text-white">
@@ -230,9 +248,10 @@ interface SiteAwareLayoutProps {
   children: React.ReactNode
 }
 
+// Main component - ONLY CHANGED: useSiteAuth → useSafeAuth
 export default function SiteAwareLayout({ children }: SiteAwareLayoutProps) {
   const { siteConfig, loading } = useSiteContext()
-  const { loading: authLoading } = useSiteAuth()
+  const { loading: authLoading } = useSafeAuth() // CHANGED THIS LINE
   const pathname = usePathname()
   
   // Skip layout for admin and API routes

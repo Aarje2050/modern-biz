@@ -1,4 +1,4 @@
-// src/app/page.tsx (FIXED - Template-aware with server components)
+// src/app/page.tsx (ENTERPRISE FIX)
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
@@ -6,6 +6,10 @@ import { getCurrentSite } from '@/lib/site-context'
 import SearchInput from '@/components/search/search-input'
 import type { Metadata } from 'next'
 import TemplatePageServer from '@/components/template/TemplatePageServer'
+
+// CRITICAL: Force dynamic rendering to prevent build-time site context access
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 interface Business {
   id: string
@@ -23,55 +27,17 @@ interface Category {
   icon?: string | null
 }
 
+// ENTERPRISE: Simplified metadata generation (no site context during build)
 export async function generateMetadata(): Promise<Metadata> {
-  const siteConfig = getCurrentSite()
-  
-  if (!siteConfig) {
-    return {
+  return {
+    title: 'Business Directory - Find Local Businesses & Services',
+    description: 'Discover and connect with local businesses in your area.',
+    keywords: 'business directory, local services, reviews, business listings',
+    openGraph: {
       title: 'Business Directory - Find Local Businesses & Services',
       description: 'Discover and connect with local businesses in your area.',
-    }
-  }
-
-  const { config } = siteConfig
-  const niche = config?.niche || 'business'
-  const location = config?.location || ''
-  
-  // Dynamic metadata based on site type
-  if (siteConfig.site_type === 'landing') {
-    return {
-      title: `${siteConfig.name} - ${niche} Services`,
-      description: `Get premium ${niche} services. Transform your business today.`,
-      keywords: `${niche}, services, premium, business`,
-    }
-  }
-  
-  if (siteConfig.site_type === 'service') {
-    return {
-      title: `${siteConfig.name} - Professional ${niche} Services${location ? ` in ${location}` : ''}`,
-      description: `Trusted ${niche} experts${location ? ` serving ${location}` : ''}. Licensed, insured, and committed to excellence.`,
-      keywords: `${niche}, ${location}, professional, licensed, insured`,
-    }
-  }
-  
-  // Default directory metadata
-  const title = `${siteConfig.name} - Find Top ${niche.charAt(0).toUpperCase() + niche.slice(1)} Services${location ? ` in ${location.charAt(0).toUpperCase() + location.slice(1)}` : ''}`
-  const description = `Discover top-rated ${niche} services${location ? ` in ${location}` : ''}. Read reviews, compare prices, and book online.`
-
-  return {
-    title,
-    description,
-    keywords: `${niche}, ${location}, directory, reviews, services, local business`,
-    openGraph: {
-      title,
-      description,
-      url: '/',
-      siteName: siteConfig.name,
       type: 'website',
     },
-    alternates: {
-      canonical: '/',
-    }
   }
 }
 
@@ -105,8 +71,9 @@ function getNicheContent(niche: string, location: string) {
   }
 }
 
-// Keep your existing directory homepage as a separate component (SERVER COMPONENT)
+// ENTERPRISE: Separate server component for directory homepage
 async function DirectoryHomePage() {
+  // CRITICAL: Get site context at runtime, not build time
   const siteConfig = getCurrentSite()
   
   if (!siteConfig) {
@@ -126,28 +93,50 @@ async function DirectoryHomePage() {
   
   const supabase = createClient()
   
-  // Get categories for this site only
-  const { data: topCategories } = await supabase
-    .from('categories')
-    .select('id, name, slug, icon')
-    .eq('site_id', siteConfig.id)
-    .limit(8)
+  // ENTERPRISE: Proper error handling for database queries
+  let topCategories: Category[] = []
+  let recentBusinesses: Business[] = []
+  let totalBusinesses = 0
   
-  // Get recent businesses for this site only
-  const { data: recentBusinesses } = await supabase
-    .from('businesses')
-    .select('id, name, slug, short_description, logo_url, site_id')
-    .eq('site_id', siteConfig.id)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-    .limit(4)
-  
-  // Get total count for this site only
-  const { count: totalBusinesses } = await supabase
-    .from('businesses')
-    .select('*', { count: 'exact', head: true })
-    .eq('site_id', siteConfig.id)
-    .eq('status', 'active')
+  try {
+    // Get categories for this site only
+    const { data: categoriesData, error: categoriesError } = await supabase
+      .from('categories')
+      .select('id, name, slug, icon')
+      .eq('site_id', siteConfig.id)
+      .limit(8)
+    
+    if (!categoriesError && categoriesData) {
+      topCategories = categoriesData
+    }
+    
+    // Get recent businesses for this site only
+    const { data: businessesData, error: businessesError } = await supabase
+      .from('businesses')
+      .select('id, name, slug, short_description, logo_url, site_id')
+      .eq('site_id', siteConfig.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(4)
+    
+    if (!businessesError && businessesData) {
+      recentBusinesses = businessesData
+    }
+    
+    // Get total count for this site only
+    const { count, error: countError } = await supabase
+      .from('businesses')
+      .select('*', { count: 'exact', head: true })
+      .eq('site_id', siteConfig.id)
+      .eq('status', 'active')
+    
+    if (!countError && count !== null) {
+      totalBusinesses = count
+    }
+  } catch (error) {
+    console.error('Database query error:', error)
+    // Continue with empty data - graceful degradation
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -162,7 +151,6 @@ async function DirectoryHomePage() {
         
         <div className="relative container mx-auto px-4 py-8 md:py-16">
           <div className="max-w-4xl mx-auto text-center">
-            {/* Mobile-First Typography */}
             <h1 className="text-2xl md:text-5xl font-bold mb-3 md:mb-6 leading-tight">
               {content.title}
               {location && (
@@ -176,7 +164,6 @@ async function DirectoryHomePage() {
               {content.subtitle}
             </p>
             
-            {/* Mobile-Optimized Search */}
             <div className="mb-6 md:mb-8 px-2">
               <SearchInput 
                 placeholder={content.placeholder}
@@ -184,7 +171,6 @@ async function DirectoryHomePage() {
               />
             </div>
 
-            {/* Mobile-Friendly Popular Services */}
             <div className="flex flex-wrap justify-center gap-2 md:gap-3 px-2">
               {content.popular.map((service: string, index: number) => (
                 <Link
@@ -200,12 +186,12 @@ async function DirectoryHomePage() {
         </div>
       </section>
 
-      {/* Mobile App-Style Stats */}
+      {/* Stats Section */}
       <section className="py-4 md:py-6 bg-white shadow-sm">
         <div className="container mx-auto px-4">
           <div className="flex justify-center items-center space-x-6 md:space-x-8 text-center">
             <div className="flex flex-col">
-              <div className="text-lg md:text-2xl font-bold text-gray-900">{totalBusinesses || 0}</div>
+              <div className="text-lg md:text-2xl font-bold text-gray-900">{totalBusinesses}</div>
               <div className="text-xs md:text-sm text-gray-600">Local Services</div>
             </div>
             <div className="h-8 w-px bg-gray-300"></div>
@@ -222,7 +208,7 @@ async function DirectoryHomePage() {
         </div>
       </section>
 
-      {/* Mobile App-Style Categories */}
+      {/* Categories Section */}
       <section className="py-6 md:py-12 bg-white">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between mb-4 md:mb-8">
@@ -237,9 +223,9 @@ async function DirectoryHomePage() {
             </Link>
           </div>
           
-          {topCategories && topCategories.length > 0 ? (
+          {topCategories.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
-              {topCategories.slice(0, 8).map((category: Category) => (
+              {topCategories.map((category: Category) => (
                 <Link
                   key={category.id}
                   href={`/categories/${category.slug}`}
@@ -276,8 +262,8 @@ async function DirectoryHomePage() {
         </div>
       </section>
 
-      {/* Mobile App-Style Recent Services */}
-      {recentBusinesses && recentBusinesses.length > 0 && (
+      {/* Recent Businesses */}
+      {recentBusinesses.length > 0 && (
         <section className="py-6 md:py-12 bg-gray-50">
           <div className="container mx-auto px-4">
             <div className="flex items-center justify-between mb-4 md:mb-8">
@@ -299,9 +285,7 @@ async function DirectoryHomePage() {
                   href={`/businesses/${business.slug}`}
                   className="block bg-white rounded-lg border hover:shadow-md transition-all duration-200 overflow-hidden"
                 >
-                  {/* Mobile: Horizontal Layout, Desktop: Vertical */}
                   <div className="flex md:block">
-                    {/* Logo */}
                     <div className="w-16 h-16 md:w-full md:h-32 bg-gray-200 relative flex-shrink-0">
                       {business.logo_url ? (
                         <Image
@@ -317,7 +301,6 @@ async function DirectoryHomePage() {
                       )}
                     </div>
                     
-                    {/* Content */}
                     <div className="flex-1 p-3 md:p-4">
                       <h3 className="font-semibold text-gray-900 mb-1 text-sm md:text-base line-clamp-1">
                         {business.name}
@@ -334,7 +317,7 @@ async function DirectoryHomePage() {
         </section>
       )}
 
-      {/* Mobile App-Style Benefits */}
+      {/* Benefits Section */}
       <section className="py-6 md:py-12 bg-white">
         <div className="container mx-auto px-4">
           <h2 className="text-lg md:text-2xl font-bold text-center mb-6 md:mb-8 text-gray-900">
@@ -361,7 +344,7 @@ async function DirectoryHomePage() {
         </div>
       </section>
 
-      {/* Mobile App-Style CTA */}
+      {/* CTA Section */}
       <section className="py-8 md:py-16 bg-gradient-to-r from-gray-900 to-gray-800 text-white">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4">
@@ -385,15 +368,21 @@ async function DirectoryHomePage() {
   )
 }
 
-// Template-aware homepage (SERVER COMPONENT)
+// ENTERPRISE: Template-aware homepage with proper error boundaries
 export default async function HomePage() {
-  const siteConfig = getCurrentSite()
-  
-  // For directory sites or no site config, use the directory homepage
-  if (!siteConfig || siteConfig.site_type === 'directory' || siteConfig.template === 'directory-modern') {
+  try {
+    const siteConfig = getCurrentSite()
+    
+    // For directory sites or no site config, use the directory homepage
+    if (!siteConfig || siteConfig.site_type === 'directory' || siteConfig.template === 'directory-modern') {
+      return <DirectoryHomePage />
+    }
+    
+    // For other site types, use the template system
+    return <TemplatePageServer siteConfig={siteConfig} fallback={<DirectoryHomePage />} />
+  } catch (error) {
+    console.error('HomePage error:', error)
+    // Graceful fallback
     return <DirectoryHomePage />
   }
-  
-  // For other site types, use the template system (client-side)
-  return <TemplatePageServer siteConfig={siteConfig} fallback={<DirectoryHomePage />} />
 }
