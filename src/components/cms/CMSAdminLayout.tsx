@@ -49,6 +49,12 @@ export default function CMSAdminLayout({ children, siteId }: CMSAdminLayoutProps
       current: pathname.includes('/media')
     },
     {
+      name: 'Templates',
+      href: `/admin/sites/${siteId}/templates`,
+      icon: '🖼️',
+      current: pathname.includes('/templates')
+    },
+    {
       name: 'Appearance',
       href: `/admin/sites/${siteId}/appearance`,
       icon: '🎨',
