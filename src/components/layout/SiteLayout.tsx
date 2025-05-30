@@ -1,5 +1,5 @@
 // src/components/layout/SiteLayout.tsx - ENHANCED LAYOUT WITH MENU SYSTEM
-import { getCurrentSiteId } from '@/lib/site-context'
+import { getCurrentSite, getCurrentSiteId } from '@/lib/site-context'
 import MenuRenderer from './MenuRenderer'
 import Link from 'next/link'
 
@@ -8,7 +8,7 @@ interface SiteLayoutProps {
 }
 
 export default async function SiteLayout({ children }: SiteLayoutProps) {
-  const siteConfig = getCurrentSiteId()
+  const siteConfig = getCurrentSite()
   
   if (!siteConfig) {
     return <div className="min-h-screen bg-gray-100">{children}</div>
