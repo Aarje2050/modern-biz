@@ -1,30 +1,23 @@
-// src/app/login/page.tsx (SITE-AWARE)
+// src/app/login/page.tsx - FIXED ENTERPRISE VERSION
 import SiteAwareLoginForm from '@/components/auth/SiteAwareLoginForm'
 import { getCurrentSite } from '@/lib/site-context'
-import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 
 export async function generateMetadata(): Promise<Metadata> {
-  const siteConfig = getCurrentSite()
+  const siteConfig = getCurrentSite() // FIXED: Use getCurrentSite not getCurrentSiteId
   
-  const siteName = siteConfig?.name || 'Website'
+  const siteName = siteConfig?.name || 'BusinessDir'
   
   return {
     title: `Sign In - ${siteName}`,
-    description: `Sign in to your ${siteName} account`,
+    description: `Sign in to your ${siteName} account to manage your business profile and connect with customers`,
     robots: 'noindex',
   }
 }
 
 export default function LoginPage() {
-  const siteConfig = getCurrentSite()
-  
-  // For non-directory sites, only allow login if explicitly enabled
-  if (siteConfig && siteConfig.site_type !== 'directory') {
-    // Landing and service sites might not need login functionality
-    // Redirect to homepage for now
-    redirect('/')
-  }
+  // REMOVED: Server-side redirect logic that was causing issues
+  // All sites can have login functionality
   
   return <SiteAwareLoginForm />
 }

@@ -1,28 +1,23 @@
-// src/app/register/page.tsx (SITE-AWARE)
+// src/app/register/page.tsx - FIXED ENTERPRISE VERSION
 import SiteAwareRegisterForm from '@/components/auth/SiteAwareRegisterForm'
 import { getCurrentSite } from '@/lib/site-context'
-import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteConfig = getCurrentSite()
   
-  const siteName = siteConfig?.name || 'Website'
+  const siteName = siteConfig ? siteConfig.name : 'BusinessDir'
   
   return {
-    title: `Sign Up - ${siteName}`,
-    description: `Create an account on ${siteName}`,
+    title: `Join ${siteName} - Create Your Account`,
+    description: `Create an account on ${siteName} to discover local businesses, write reviews, and connect with your community`,
     robots: 'noindex',
   }
 }
 
 export default function RegisterPage() {
-  const siteConfig = getCurrentSite()
-  
-  // Only directory sites allow registration for now
-  if (siteConfig && siteConfig.site_type !== 'directory') {
-    redirect('/')
-  }
+  // REMOVED: Server-side redirect logic that was causing issues
+  // All sites can have registration functionality
   
   return <SiteAwareRegisterForm />
 }

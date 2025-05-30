@@ -1,7 +1,7 @@
 // src/components/layout/SiteAwareLayout.tsx (MINIMAL FIX - Keep your existing code)
 'use client'
 import { useSiteContext } from '@/hooks/useSiteContext'
-import { useSiteAuth } from '@/providers/SiteAwareAuthProvider'
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react' // ADD THIS
 import Link from 'next/link'
@@ -16,17 +16,17 @@ function useSafeAuth() {
   }, [])
   
   try {
-    const auth = useSiteAuth()
-    return mounted ? auth : { user: null, isAuthorizedForSite: false, signOut: async () => {}, loading: true }
+    const auth = useUnifiedAuth()
+    return mounted ? auth : { user: null, isAuthenticated: false, signOut: async () => {}, loading: true }
   } catch (error) {
     // Fallback if provider not available
-    return { user: null, isAuthorizedForSite: false, signOut: async () => {}, loading: false }
+    return { user: null, isAuthenticated: false, signOut: async () => {}, loading: false }
   }
 }
 
 // Directory header (your existing header functionality) - ONLY CHANGED: useSiteAuth → useSafeAuth
 function DirectoryHeader() {
-  const { user, isAuthorizedForSite, signOut } = useSafeAuth() // CHANGED THIS LINE
+  const { user, isAuthenticated, signOut } = useSafeAuth() // CHANGED THIS LINE
   
   return (
     <header className="bg-white shadow-sm border-b">
@@ -50,7 +50,7 @@ function DirectoryHeader() {
           </div>
           
           <div className="flex items-center space-x-4">
-            {isAuthorizedForSite ? (
+            {isAuthenticated ? (
               <>
                 <Link
                   href="/dashboard"
@@ -82,7 +82,7 @@ function DirectoryHeader() {
 
 // Landing page header - ONLY CHANGED: useSiteAuth → useSafeAuth
 function LandingHeader({ siteName, primaryColor }: { siteName: string, primaryColor: string }) {
-  const { user, isAuthorizedForSite, signOut } = useSafeAuth() // CHANGED THIS LINE
+  const { user, isAuthenticated, signOut } = useSafeAuth() // CHANGED THIS LINE
   
   return (
     <header className="bg-white shadow-sm">
@@ -105,7 +105,7 @@ function LandingHeader({ siteName, primaryColor }: { siteName: string, primaryCo
           </nav>
           
           <div className="flex items-center space-x-4">
-            {isAuthorizedForSite ? (
+            {isAuthenticated ? (
               <button
                 onClick={signOut}
                 className="text-gray-600 hover:text-gray-900 text-sm"
@@ -128,7 +128,7 @@ function LandingHeader({ siteName, primaryColor }: { siteName: string, primaryCo
 
 // Service business header - ONLY CHANGED: useSiteAuth → useSafeAuth
 function ServiceHeader({ siteName, primaryColor, location }: { siteName: string, primaryColor: string, location?: string }) {
-  const { user, isAuthorizedForSite, signOut } = useSafeAuth() // CHANGED THIS LINE
+  const { user, isAuthenticated, signOut } = useSafeAuth() // CHANGED THIS LINE
   
   return (
     <header className="bg-white shadow-sm">
@@ -159,7 +159,7 @@ function ServiceHeader({ siteName, primaryColor, location }: { siteName: string,
           </nav>
           
           <div className="flex items-center space-x-4">
-            {isAuthorizedForSite && (
+            {isAuthenticated && (
               <button
                 onClick={signOut}
                 className="text-gray-600 hover:text-gray-900 text-sm mr-2"

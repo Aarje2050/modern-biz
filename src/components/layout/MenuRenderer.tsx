@@ -1,6 +1,6 @@
 // src/components/layout/MenuRenderer.tsx - FRONTEND MENU RENDERER
 import Link from 'next/link'
-import { getCurrentSite } from '@/lib/site-context'
+import { getCurrentSiteId } from '@/lib/site-context'
 import { createClient } from '@/lib/supabase/server'
 
 interface MenuItem {
@@ -36,7 +36,7 @@ export default async function MenuRenderer({
   style = 'horizontal',
   showIcons = false 
 }: MenuRendererProps) {
-  const siteConfig = getCurrentSite()
+  const siteConfig = getCurrentSiteId()
   
   if (!siteConfig) {
     return null
