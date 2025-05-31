@@ -2,9 +2,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
 import ContactsManagement from '@/components/crm/contacts-management'
+import { useAuth } from '@/providers/app-provider'
+
 
 export default function ContactsPage() {
   const { user } = useAuth()

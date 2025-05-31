@@ -3,8 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useUnifiedAuth } from '@/hooks/useUnifiedAuth' // FIXED: Use unified auth
-import { useSiteContext } from '@/hooks/useSiteContext'
+import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SiteAwareRegisterForm() {

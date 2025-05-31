@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/providers/auth-provider'
+import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
 import { useParams, useRouter } from 'next/navigation'
 import MessageThread from '@/components/messaging/message-thread'
 import Link from 'next/link'

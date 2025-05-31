@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/providers/auth-provider'
+import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
 import ConversationsList from '@/components/messaging/conversations-list'
 import MessageThread from '@/components/messaging/message-thread'
 import NewMessageModal from '@/components/messaging/new-message-modal'

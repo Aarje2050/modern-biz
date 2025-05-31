@@ -1,11 +1,7 @@
 'use client'
 import { usePathname } from 'next/navigation'
-import { useSiteContext } from '@/hooks/useSiteContext'
-import { resolveTemplate, getThemeVariables } from '@/lib/template/middleware'
+import { useSiteContext } from '@/providers/app-provider'
 import { Suspense } from 'react'
-
-// DON'T import existing pages - let them handle their own metadata
-// Instead, use dynamic imports or separate client components
 
 // Template component registry (NEW COMPONENTS ONLY)
 const COMPONENT_REGISTRY = {
@@ -41,29 +37,46 @@ const COMPONENT_REGISTRY = {
   BookingPage: () => <div>Booking Page (TODO)</div>,
 }
 
+// Simple template resolver (no external dependency)
+function resolveTemplate(pathname: string, siteConfig: any) {
+  const siteType = siteConfig?.site_type || 'directory'
+  
+  // Route mapping
+  const routes: Record<string, { component: string; isSupported: boolean }> = {
+    '/': {
+      component: siteType === 'landing' ? 'LandingHome' : 
+                 siteType === 'service' ? 'ServiceHome' : 'DirectoryHome',
+      isSupported: siteType !== 'directory'
+    },
+    '/about': { component: 'AboutPage', isSupported: true },
+    '/contact': { component: 'ContactPage', isSupported: true },
+    '/services': { component: 'ServicesPage', isSupported: siteType === 'service' },
+    '/book': { component: 'BookingPage', isSupported: siteType === 'service' }
+  }
+  
+  const route = routes[pathname] || { component: null, isSupported: false }
+  
+  return {
+    template: { name: siteConfig?.template, siteType },
+    component: route.component,
+    isSupported: route.isSupported
+  }
+}
+
+// Theme variables helper
+function getThemeVariables(siteConfig: any) {
+  const theme = siteConfig?.config?.theme || {}
+  return {
+    '--primary-color': theme.primaryColor || '#3b82f6',
+    '--secondary-color': theme.secondaryColor || '#64748b'
+  }
+}
+
 // Loading component
 function TemplateLoading() {
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-    </div>
-  )
-}
-
-// Error component
-function TemplateError({ error }: { error: string }) {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Page Not Found</h1>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <button 
-          onClick={() => window.location.href = '/'}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Go Home
-        </button>
-      </div>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 // Directory template home - wraps existing homepage functionality
-import { useSiteContext } from '@/hooks/useSiteContext'
+import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
 import SearchInput from '@/components/search/search-input'
 import BusinessCard from '@/components/businesses/business-card'
 

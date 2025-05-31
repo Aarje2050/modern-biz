@@ -1,7 +1,7 @@
 // Shared Contact Page Template
 'use client'
 import { useState } from 'react'
-import { useSiteContext } from '@/hooks/useSiteContext'
+import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
 import { hasFeature } from '@/lib/template/middleware'
 
 export default function Contact() {

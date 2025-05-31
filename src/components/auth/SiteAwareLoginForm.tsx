@@ -3,8 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useUnifiedAuth } from '@/hooks/useUnifiedAuth'
-import { useSiteContext } from '@/hooks/useSiteContext'
+import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SiteAwareLoginForm() {

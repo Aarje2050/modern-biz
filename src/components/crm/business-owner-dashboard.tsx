@@ -16,7 +16,7 @@ import {
   Eye,
   Star
 } from 'lucide-react'
-import { useAuth } from '@/providers/auth-provider'
+import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
 import { useSupabase } from '@/hooks/useSupabase'
 
 interface CRMStats {

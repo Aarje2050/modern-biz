@@ -1,7 +1,7 @@
 // src/components/layout/SiteAwareLayout.tsx (MINIMAL FIX - Keep your existing code)
 'use client'
-import { useSiteContext } from '@/hooks/useSiteContext'
-import { useUnifiedAuth } from '@/hooks/useUnifiedAuth'
+import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
+
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react' // ADD THIS
 import Link from 'next/link'

@@ -1,8 +1,8 @@
 // src/app/debug/auth/page.tsx - TEMPORARY DEBUG PAGE
 'use client'
 
-import { useUnifiedAuth } from '@/hooks/useUnifiedAuth'
-import { useSiteContext } from '@/hooks/useSiteContext'
+import { useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
+
 
 export default function AuthDebugPage() {
   const { 

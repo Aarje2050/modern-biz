@@ -1,9 +1,9 @@
-// src/components/auth/DashboardAccessGuard.tsx - ENTERPRISE ACCESS CONTROL
+// src/components/auth/DashboardAccessGuard.tsx - FIXED IMPORTS
 'use client'
 
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import { useDashboardAccess,useUnifiedAuth } from '@/hooks/useUnifiedAuth'
+import { useDashboardAccess, useUnifiedAuth } from '@/providers/app-provider'
 
 interface DashboardAccessGuardProps {
   children: React.ReactNode
@@ -95,29 +95,6 @@ export function withDashboardAccess<P extends object>(
 }
 
 /**
- * EXAMPLE: How to use in your dashboard layout
- */
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <DashboardAccessGuard>
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex">
-          {/* Your dashboard sidebar */}
-          <nav className="w-64 bg-white shadow-sm">
-            {/* Navigation items */}
-          </nav>
-          
-          {/* Main content */}
-          <main className="flex-1 p-6">
-            {children}
-          </main>
-        </div>
-      </div>
-    </DashboardAccessGuard>
-  )
-}
-
-/**
  * CONVENIENCE: Permission-based conditional rendering
  */
 interface PermissionGateProps {
@@ -137,18 +114,3 @@ export function PermissionGate({ permission, children, fallback = null }: Permis
   
   return hasPermission ? <>{children}</> : <>{fallback}</>
 }
-
-/**
- * EXAMPLE: Usage in components
- * 
- * <PermissionGate permission="canAccessAnalytics">
- *   <Analytics />
- * </PermissionGate>
- * 
- * <PermissionGate 
- *   permission="canManageBusinesses" 
- *   fallback={<div>Upgrade to manage businesses</div>}
- * >
- *   <BusinessManagement />
- * </PermissionGate>
- */

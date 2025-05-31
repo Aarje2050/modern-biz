@@ -1,6 +1,6 @@
 // src/hooks/useCRM.ts
 import { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '@/providers/auth-provider'
+import { useAuth } from '@/providers/app-provider'
 import { createClient } from '@/lib/supabase/client'
 
 // Enhanced Contact interface with profile data

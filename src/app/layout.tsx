@@ -1,8 +1,8 @@
-// src/app/layout.tsx (FIXED - Single Auth Provider)
+// src/app/layout.tsx - FIXED TO USE UNIFIED PROVIDER
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { Metadata } from 'next'
-import AuthProvider from '@/providers/auth-provider'
+import AppProvider from '@/providers/app-provider'
 import SiteAwareLayout from '@/components/layout/SiteAwareLayout'
 import ClientLayout from './client-layout'
 
@@ -57,8 +57,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body className={`${inter.className} bg-gray-50`}>
-        {/* ENTERPRISE: Single auth provider - eliminates conflicts */}
-        <AuthProvider>
+        {/* FIXED: Using unified AppProvider instead of AuthProvider */}
+        <AppProvider>
           <SiteAwareLayout>
             <ClientLayout>
               <div className="flex flex-col min-h-screen">
@@ -68,7 +68,7 @@ export default function RootLayout({
               </div>
             </ClientLayout>
           </SiteAwareLayout>
-        </AuthProvider>
+        </AppProvider>
       </body>
     </html>
   )

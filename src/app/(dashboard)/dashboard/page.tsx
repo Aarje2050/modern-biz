@@ -1,7 +1,7 @@
 // src/app/(dashboard)/dashboard/page.tsx - ENTERPRISE FIXED VERSION
 'use client'
 
-import { useUnifiedAuth } from '@/hooks/useUnifiedAuth'
+import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
 import { DashboardAccessGuard } from '@/components/auth/DashboardAccessGuard'
 import dynamic from 'next/dynamic'
 

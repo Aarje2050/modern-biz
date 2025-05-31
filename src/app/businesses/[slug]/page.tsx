@@ -1,10 +1,10 @@
-// src/app/businesses/[slug]/page.tsx
+// src/app/businesses/[slug]/page.tsx (MINIMAL Site-Aware Changes Only)
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils/formatting'
-import { getCurrentSite } from '@/lib/site-context'
+import { getCurrentSite } from '@/lib/site-context' // ADDED: Site context
 import dynamic from 'next/dynamic'
 import type { Metadata } from 'next'
 
@@ -79,7 +79,7 @@ interface BusinessCategory {
   category: {
     name: string
     slug: string
-  }
+  }[]
 }
 
 interface Business {
@@ -156,7 +156,7 @@ function isCurrentlyOpen(businessHours: any): { isOpen: boolean; nextChange: str
 
 // Server Components
 function Breadcrumbs({ business, siteConfig }: { business: Business; siteConfig: any }) {
-  const category = business.categories?.[0]?.category
+  const category = business.categories?.[0]?.category?.[0]
   
   return (
     <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4 px-4 md:px-6 overflow-x-auto">
@@ -238,8 +238,16 @@ function BusinessHours({ businessHours }: { businessHours: any }) {
 // SEO Metadata
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const supabase = createClient()
-  const siteConfig = getCurrentSite()
+  const siteConfig = getCurrentSite() // ADDED: Site context
   
+  // ADDED: Site check
+  if (!siteConfig) {
+    return {
+      title: 'Business Not Found',
+      description: 'The business you are looking for could not be found.'
+    }
+  }
+
   const { data: business } = await supabase
     .from('businesses')
     .select(`
@@ -250,6 +258,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       categories:business_categories(category:categories(name, slug))
     `)
     .eq('slug', params.slug)
+    .eq('site_id', siteConfig.id) // ADDED: Site filter
     .eq('status', 'active')
     .single()
     
@@ -261,8 +270,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 
   const category = business.categories?.[0]?.category?.[0]?.name
-  const siteName = siteConfig?.name || 'Business Directory'
-  const location = siteConfig?.config?.location || ''
+  const siteName = siteConfig?.name || 'Business Directory' // ADDED: Site name
+  const location = siteConfig?.config?.location || '' // ADDED: Site location
   
   const title = `${business.name}${category ? ` - ${category}` : ''}${location ? ` in ${location}` : ''} | ${siteName}`
   const description =  `Learn more about ${business.name}, a trusted local business.`
@@ -289,7 +298,19 @@ export const revalidate = 600
 
 export default async function BusinessDetailPage({ params }: { params: { slug: string } }) {
   const supabase = createClient()
-  const siteConfig = getCurrentSite()
+  const siteConfig = getCurrentSite() // ADDED: Site context
+  
+  // ADDED: Site check
+  if (!siteConfig) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Site Not Found</h1>
+          <p className="text-gray-600">This domain is not configured in our system.</p>
+        </div>
+      </div>
+    )
+  }
   
   // Get business with all related data
   const { data: business, error } = await supabase
@@ -299,6 +320,7 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
       categories:business_categories(category:categories(name, slug))
     `)
     .eq('slug', params.slug)
+    .eq('site_id', siteConfig.id) // ADDED: Site filter
     .single()
   
   if (error || !business || business.status !== 'active') {
@@ -318,8 +340,10 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
     supabase.from('business_contacts').select('*').eq('business_id', business.id),
     supabase.from('media').select('*').eq('business_id', business.id).order('is_featured', { ascending: false }).limit(12),
     supabase.auth.getSession(),
+    // MODIFIED: Related businesses from same site only
     supabase.from('businesses')
       .select('id, name, slug, short_description, logo_url')
+      .eq('site_id', siteConfig.id)
       .eq('status', 'active')
       .neq('id', business.id)
       .limit(4),
@@ -407,15 +431,17 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
                   
                   {/* Categories & Verification */}
                   <div className="flex flex-wrap items-center gap-2 mb-3">
-                    {business.categories?.slice(0, 2).map((cat: BusinessCategory, idx: number) => (
-                      <Link
-                        key={idx}
-                        href={`/categories/${cat.category.slug}`}
-                        className="inline-flex items-center px-2 py-1 bg-red-50 text-red-700 text-xs font-medium rounded-full hover:bg-red-100 transition-colors"
-                      >
-                        {cat.category.name}
-                      </Link>
-                    ))}
+                    {business.categories?.slice(0, 2).map((cat: BusinessCategory, idx: number) => 
+                      cat.category?.[0] ? (
+                        <Link
+                          key={idx}
+                          href={`/categories/${cat.category[0].slug}`}
+                          className="inline-flex items-center px-2 py-1 bg-red-50 text-red-700 text-xs font-medium rounded-full hover:bg-red-100 transition-colors"
+                        >
+                          {cat.category[0].name}
+                        </Link>
+                      ) : null
+                    )}
                     
                     {business.verification_level !== 'none' && (
                       <span className="inline-flex items-center px-2 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-full">
@@ -682,7 +708,9 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
           name: business.name,
           description: business.description,
           short_description: business.short_description,
-          categories: business.categories?.map((c: BusinessCategory) => c.category.name) || [],
+          categories: business.categories?.flatMap((c: BusinessCategory) => 
+            c.category?.map(cat => cat.name) || []
+          ) || [],
           locations: locations?.map(loc => ({
             address_line1: loc.address_line1,
             city: loc.city,

@@ -1,6 +1,6 @@
 // Shared About Page Template
 'use client'
-import { useSiteContext } from '@/hooks/useSiteContext'
+import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
 
 export default function About() {
   const { siteConfig } = useSiteContext()

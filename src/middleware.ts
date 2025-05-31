@@ -1,61 +1,47 @@
-// src/middleware.ts - ENTERPRISE OPTIMIZED VERSION
+// src/middleware.ts - COMPLETE FIXED VERSION
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getSiteByDomain } from '@/lib/supabase/tenant-client'
 
-// ENTERPRISE: In-memory cache for site lookups
-interface SiteCache {
-  siteConfig: any
-  timestamp: number
-  domain: string
-  isFailed?: boolean
-}
+// ===============================
+// CONFIGURATION
+// ===============================
 
-class SiteCacheManager {
-  private cache = new Map<string, SiteCache>()
-  private readonly TTL = 10 * 60 * 1000 // 10 minutes
-  private readonly FAILURE_TTL = 2 * 60 * 1000 // 2 minutes for failures
-
-  set(domain: string, siteConfig: any | null, isFailed = false) {
-    this.cache.set(domain, {
-      siteConfig,
-      timestamp: Date.now(),
-      domain,
-      isFailed
-    })
-  }
-
-  get(domain: string): { siteConfig: any | null; isFailed: boolean } | null {
-    const cached = this.cache.get(domain)
-    if (!cached) return null
-
-    const ttl = cached.isFailed ? this.FAILURE_TTL : this.TTL
-    const isExpired = Date.now() - cached.timestamp > ttl
-
-    if (isExpired) {
-      this.cache.delete(domain)
-      return null
-    }
-
-    return { siteConfig: cached.siteConfig, isFailed: cached.isFailed || false }
-  }
-
-  has(domain: string): boolean {
-    return this.get(domain) !== null
-  }
-}
-
-const siteCache = new SiteCacheManager()
-
-// ENTERPRISE: Development mode configuration
-const isDevelopment = process.env.NODE_ENV === 'development'
+const isDev = process.env.NODE_ENV === 'development'
 const LOCALHOST_DOMAINS = ['localhost:3000', 'localhost:3001', '127.0.0.1:3000']
 
+// Routes that require authentication
+const PROTECTED_ROUTES = [
+  '/dashboard',
+  '/businesses/add', 
+  '/profile',
+  '/saved',
+  '/messages'
+]
+
+// Auth routes (redirect to dashboard if already logged in)
+const AUTH_ROUTES = [
+  '/login',
+  '/register',
+  '/auth/verify',
+  '/forgot-password'
+]
+
+// Routes that should skip all middleware processing
+const SKIP_ROUTES = [
+  '/_next/',
+  '/favicon.ico',
+  '/robots.txt',
+  '/sitemap.xml',
+  '/api/' // We'll handle API auth separately
+]
+
+// Route access control by site type
 const ROUTE_ACCESS: Record<string, string[]> = {
   'directory': [
     '/', '/businesses', '/businesses/*', '/categories', '/categories/*', 
     '/search', '/about', '/contact', '/dashboard', '/dashboard/*', 
-    '/profile', '/messages', '/messages/*', '/saved', '/reviews'
+    '/profile', '/messages', '/messages/*', '/saved', '/reviews',
+    '/login', '/register', '/auth/*', '/admin', '/admin/*'
   ],
   'landing': [
     '/', '/about', '/contact'
@@ -68,11 +54,35 @@ const ROUTE_ACCESS: Record<string, string[]> = {
   ]
 }
 
-function isRouteAllowed(pathname: string, siteType: string): boolean {
+// ===============================
+// HELPER FUNCTIONS
+// ===============================
+
+function shouldSkipMiddleware(pathname: string): boolean {
+  return SKIP_ROUTES.some(route => pathname.startsWith(route)) ||
+         pathname.includes('.') // Skip files with extensions
+}
+
+function isProtectedRoute(pathname: string): boolean {
+  // Admin routes are always protected (except login)
+  if (pathname === '/admin/login') return false
+  if (pathname.startsWith('/admin')) return true
+  
+  // Check other protected routes
+  return PROTECTED_ROUTES.some(route => pathname.startsWith(route))
+}
+
+function isAuthRoute(pathname: string): boolean {
+  return AUTH_ROUTES.includes(pathname)
+}
+
+function isRouteAllowedForSiteType(pathname: string, siteType: string): boolean {
   const allowedRoutes = ROUTE_ACCESS[siteType] || ROUTE_ACCESS['directory']
   
+  // Exact match
   if (allowedRoutes.includes(pathname)) return true
   
+  // Wildcard match (e.g., '/businesses/*' matches '/businesses/slug')
   const wildcardMatch = allowedRoutes.some(route => {
     if (route.endsWith('/*')) {
       const basePath = route.slice(0, -2)
@@ -80,189 +90,141 @@ function isRouteAllowed(pathname: string, siteType: string): boolean {
     }
     return false
   })
-  if (wildcardMatch) return true
   
-  return allowedRoutes.some(route => {
-    if (route.includes('[') && route.includes(']')) {
-      const routeParts = route.split('/')
-      const pathParts = pathname.split('/')
-      
-      if (routeParts.length !== pathParts.length) return false
-      
-      return routeParts.every((part, i) => {
-        if (part.startsWith('[') && part.endsWith(']')) return true
-        return part === pathParts[i]
-      })
-    }
-    return false
-  })
+  return wildcardMatch
 }
 
-function shouldSkipSiteDetection(pathname: string): boolean {
-  const skipRoutes = [
-    '/api/', '/_next/', '/favicon.ico', '/robots.txt', '/sitemap.xml',
-    '/admin/login', '/login', '/register', '/auth/', '/verify', '/debug'
-  ]
-  
-  return skipRoutes.some(route => pathname.startsWith(route))
-}
-
-function isProtectedRoute(pathname: string): boolean {
-  const protectedRoutes = ['/dashboard', '/businesses/add', '/profile', '/saved', '/messages']
-  
-  if (pathname === '/admin/login') return false
-  if (pathname.startsWith('/admin')) return true
-  
-  return protectedRoutes.some(route => pathname.startsWith(route))
-}
-
-function isAuthRoute(pathname: string): boolean {
-  return ['/login', '/register', '/auth/verify', '/forgot-password'].includes(pathname)
-}
-
-// ENTERPRISE: Optimized session detection
-function hasValidSession(request: NextRequest): boolean {
+function hasValidAuthCookie(request: NextRequest): boolean {
   try {
     const cookies = request.cookies.getAll()
     
-    // Look for Supabase auth cookies
-    const supabaseAuthCookie = cookies.find(cookie => 
+    // Look for Supabase auth cookie
+    const authCookie = cookies.find(cookie => 
       cookie.name.startsWith('sb-') && 
       cookie.name.endsWith('-auth-token') &&
       cookie.value && 
-      cookie.value.length > 100
+      cookie.value.length > 50 // Basic length check
     )
     
-    if (!supabaseAuthCookie) return false
-    
-    try {
-      const cookieValue = decodeURIComponent(supabaseAuthCookie.value)
-      let authData
-      
-      if (cookieValue.startsWith('[')) {
-        const parsed = JSON.parse(cookieValue)
-        if (Array.isArray(parsed) && parsed[0] && typeof parsed[0] === 'string') {
-          authData = { access_token: parsed[0] }
-        }
-      } else if (cookieValue.startsWith('{')) {
-        authData = JSON.parse(cookieValue)
-      }
-      
-      if (authData?.access_token) {
-        const tokenParts = authData.access_token.split('.')
-        return tokenParts.length === 3
-      }
-      
-      return false
-    } catch {
-      return false
-    }
+    return !!authCookie
   } catch {
     return false
   }
 }
 
-// ENTERPRISE: Optimized site lookup with caching
-async function getSiteConfigCached(hostname: string): Promise<any | null> {
-  const searchDomain = hostname.replace(/^www\./, '')
-  
-  // ENTERPRISE: Handle localhost in development
-  if (isDevelopment && LOCALHOST_DOMAINS.includes(searchDomain)) {
-    return {
+function createDevSiteHeaders(): Record<string, string> {
+  return {
+    'x-site-id': 'localhost-dev',
+    'x-site-config': JSON.stringify({
       id: 'localhost-dev',
       name: 'Development Site',
-      domain: searchDomain,
+      domain: 'localhost:3000',
       site_type: 'directory',
       template: 'modern',
-      settings: {},
-      is_active: true
-    }
-  }
-
-  // Check cache first
-  const cached = siteCache.get(searchDomain)
-  if (cached) {
-    return cached.siteConfig
-  }
-
-  try {
-    const siteConfig = await getSiteByDomain(searchDomain)
-    
-    // Cache successful result
-    siteCache.set(searchDomain, siteConfig, false)
-    
-    return siteConfig
-  } catch (error) {
-    console.log('⚠️ Middleware: Site lookup failed for', searchDomain)
-    
-    // Cache failure to prevent repeated lookups
-    siteCache.set(searchDomain, null, true)
-    
-    return null
+      config: {},
+      status: 'active'
+    }),
+    'x-site-domain': 'localhost:3000'
   }
 }
+
+function log(message: string, data?: any) {
+  if (isDev) {
+    console.log(`🛡️ [MIDDLEWARE] ${message}`, data || '')
+  }
+}
+
+// ===============================
+// MAIN MIDDLEWARE
+// ===============================
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   
-  // ENTERPRISE: Skip middleware for static files and API routes (except auth)
-  if (pathname.startsWith('/_next/') || 
-      pathname.includes('.') ||
-      (pathname.startsWith('/api/') && !pathname.startsWith('/api/auth/'))) {
+  // Skip middleware for static files and API routes
+  if (shouldSkipMiddleware(pathname)) {
     return NextResponse.next()
   }
   
-  console.log('🔄 Middleware: Processing', pathname)
+  log(`Processing request: ${pathname}`)
   
-  let response = NextResponse.next({
+  // Create response
+  const response = NextResponse.next({
     request: { headers: request.headers }
   })
 
-  // === ENTERPRISE: SMART SITE DETECTION ===
-  let siteConfig: any = null
+  // ===============================
+  // SITE HEADERS - TRY DATABASE FIRST
+  // ===============================
   
-  // Only do site detection if we need it for route validation
-  if (!shouldSkipSiteDetection(pathname)) {
-    const hostname = request.headers.get('host') || ''
+  const hostname = request.headers.get('host') || ''
+  
+  try {
+    // Always try to get real site from database
+    const { getSiteByDomain } = await import('@/lib/supabase/tenant-client')
+    const searchDomain = hostname.replace(/^www\./, '')
+    const siteConfig = await getSiteByDomain(searchDomain)
     
-    try {
-      siteConfig = await getSiteConfigCached(hostname)
+    if (siteConfig) {
+      // Real site found - set real headers
+      log(`Real site found: ${siteConfig.name}`)
+      response.headers.set('x-site-id', siteConfig.id)
+      response.headers.set('x-site-config', JSON.stringify(siteConfig))
+      response.headers.set('x-site-domain', siteConfig.domain)
       
-      if (siteConfig) {
-        const siteType = siteConfig.site_type || 'directory'
-        
-        // Only validate routes if we have a site config
-        if (!isRouteAllowed(pathname, siteType)) {
-          console.log('🚫 Middleware: Route not allowed for site type:', pathname, siteType)
-          return NextResponse.redirect(new URL('/', request.url))
-        }
-        
-        // Set site headers for the application
-        response.headers.set('x-site-id', siteConfig.id)
-        response.headers.set('x-site-config', JSON.stringify(siteConfig))
-        response.headers.set('x-site-domain', siteConfig.domain)
-      } else {
-        // No site found - mark as potential CMS page for dynamic routing
-        response.headers.set('x-potential-cms-page', 'true')
+      // ===============================
+      // ROUTE ACCESS VALIDATION BY SITE TYPE
+      // ===============================
+      
+      const siteType = (siteConfig as any).site_type || 'directory'
+      
+      if (!isRouteAllowedForSiteType(pathname, siteType)) {
+        log(`Route ${pathname} not allowed for site type ${siteType}`)
+        return NextResponse.redirect(new URL('/', request.url))
       }
-    } catch (error) {
-      console.error('❌ Middleware: Site detection error:', error)
-      // Continue without site config on error
+      
+    } else {
+      // No real site - use dev fallback only for localhost in dev
+      if (isDev && LOCALHOST_DOMAINS.includes(hostname)) {
+        log('Using dev fallback for localhost')
+        const devHeaders = createDevSiteHeaders()
+        Object.entries(devHeaders).forEach(([key, value]) => {
+          response.headers.set(key, value)
+        })
+      } else {
+        // Production domain with no site config
+        log(`No site found for domain: ${hostname}`)
+        response.headers.set('x-site-domain', hostname)
+      }
     }
+  } catch (error) {
+    // Database error - fallback
+    log('Database error, using domain header only')
+    response.headers.set('x-site-domain', hostname)
   }
 
-  // === ENTERPRISE: SMART AUTH LOGIC ===
-  const hasSession = hasValidSession(request)
+  // ===============================
+  // SIMPLE AUTH CHECK
+  // ===============================
+  
+  const hasSession = hasValidAuthCookie(request)
+  log(`Auth status: ${hasSession ? 'authenticated' : 'not authenticated'}`)
 
-  // Only check auth for routes that actually need it
-  if (isAuthRoute(pathname) || isProtectedRoute(pathname)) {
-    if (hasSession && isAuthRoute(pathname)) {
-      console.log('🔄 Middleware: Authenticated user accessing auth page, redirecting to dashboard')
+  // Handle auth routes (login, register, etc.)
+  if (isAuthRoute(pathname)) {
+    if (hasSession) {
+      log('Authenticated user accessing auth page - redirecting to dashboard')
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
+    // Not authenticated and accessing auth page - allow
+    log('Not authenticated, allowing access to auth page')
+    return response
+  }
 
-    if (!hasSession && isProtectedRoute(pathname)) {
-      console.log('🔄 Middleware: Unauthenticated user accessing protected route, redirecting to login')
+  // Handle protected routes
+  if (isProtectedRoute(pathname)) {
+    if (!hasSession) {
+      log('Not authenticated, redirecting to login')
       
       if (pathname.startsWith('/admin')) {
         const redirectUrl = new URL('/admin/login', request.url)
@@ -274,20 +236,25 @@ export async function middleware(request: NextRequest) {
       redirectUrl.searchParams.set('redirect_to', pathname)
       return NextResponse.redirect(redirectUrl)
     }
+    
+    // Authenticated and accessing protected route - allow
+    log('Authenticated, allowing access to protected route')
+    return response
   }
 
-  console.log('✅ Middleware: Allowing access to', pathname)
+  // Public route - allow
+  log('Public route, allowing access')
   return response
 }
 
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
+     * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public folder
+     * - Files with extensions
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\..*|public).*)',
   ],

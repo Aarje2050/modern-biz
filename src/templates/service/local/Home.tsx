@@ -1,6 +1,6 @@
 // Service Business Template - Local SEO Focused
 'use client'
-import { useSiteContext } from '@/hooks/useSiteContext'
+import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
 import { hasFeature } from '@/lib/template/middleware'
 
 export default function ServiceHome() {

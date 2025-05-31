@@ -3,7 +3,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/providers/auth-provider'
+import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
 import { usePathname } from 'next/navigation'
 import UserMenu from '@/components/auth/user-menu'
 import NotificationsDropdown from '@/components/notifications/notifications-dropdown'
