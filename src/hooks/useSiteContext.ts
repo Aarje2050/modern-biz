@@ -1,21 +1,21 @@
-// src/hooks/useSiteContext.ts - ENTERPRISE OPTIMIZED VERSION
+// src/hooks/useSiteContext.ts - ENTERPRISE FIXED VERSION
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
 import { SiteConfig } from '@/lib/site-context'
 
-// ENTERPRISE: Site config cache with TTL
+// ENTERPRISE: Enhanced cache with failure tracking
 interface CachedSiteConfig {
-  data: SiteConfig
+  data: any
   timestamp: number
   domain: string
 }
 
-class SiteConfigCache {
+class EnhancedSiteConfigCache {
   private cache: CachedSiteConfig | null = null
   private readonly TTL = 10 * 60 * 1000 // 10 minutes
 
-  set(domain: string, data: SiteConfig) {
+  set(domain: string, data: any | null) {
     this.cache = {
       data,
       timestamp: Date.now(),
@@ -23,12 +23,13 @@ class SiteConfigCache {
     }
   }
 
-  get(domain: string): SiteConfig | null {
+  get(domain: string): any | null {
     if (!this.cache || this.cache.domain !== domain) {
       return null
     }
 
     const isExpired = Date.now() - this.cache.timestamp > this.TTL
+    
     if (isExpired) {
       this.cache = null
       return null
@@ -47,32 +48,66 @@ class SiteConfigCache {
 }
 
 // Global cache instance
-const siteConfigCache = new SiteConfigCache()
+const siteConfigCache = new EnhancedSiteConfigCache()
+
+// ENTERPRISE: Development mode detection
+const isDevelopment = process.env.NODE_ENV === 'development'
+const LOCALHOST_DOMAINS = ['localhost:3000', 'localhost:3001', '127.0.0.1:3000']
+
+// ENTERPRISE: Create default localhost config
+const createLocalhostConfig = (domain: string): any => ({
+  id: 'localhost-dev',
+  name: 'Development Site',
+  domain: domain,
+  site_type: 'directory',
+  template: 'modern',
+  config: {},
+  status: 'active',
+  is_active: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString()
+})
 
 export function useSiteContext() {
-  const [siteConfig, setSiteConfig] = useState<SiteConfig | null>(null)
+  const [siteConfig, setSiteConfig] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // ENTERPRISE: Prevent duplicate requests
+  // ENTERPRISE: Request deduplication
   const fetchingRef = useRef(false)
   const currentDomain = useRef<string>('')
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     const fetchSiteContext = async () => {
-      const hostname = window.location.hostname
+      const hostname = window.location.hostname + ':' + window.location.port
       
+      // ENTERPRISE: Handle localhost in development
+      if (isDevelopment && LOCALHOST_DOMAINS.includes(hostname)) {
+        console.log('🏠 Site Context: Development mode - using localhost config')
+        const localhostConfig = createLocalhostConfig(hostname)
+        setSiteConfig(localhostConfig)
+        setLoading(false)
+        setError(null)
+        return
+      }
+
       // Prevent duplicate requests for same domain
       if (fetchingRef.current && currentDomain.current === hostname) {
         console.log('🔄 Site Context: Request already in progress, skipping...')
         return
       }
 
-      // Check cache first
-      const cachedConfig = siteConfigCache.get(hostname)
-      if (cachedConfig) {
+      // Check cache first (including failed lookups)
+      const cached = siteConfigCache.get(hostname)
+      if (cached) {
         console.log('⚡ Site Context: Using cached config for', hostname)
-        setSiteConfig(cachedConfig)
+        setSiteConfig(cached)
         setLoading(false)
         setError(null)
         return
@@ -91,13 +126,16 @@ export function useSiteContext() {
           }
         })
         
+        // Don't process if component unmounted
+        if (!mountedRef.current) return
+
         console.log('🔍 Site Context: API Response status:', response.status)
         
         if (response.ok) {
           const data = await response.json()
           
           // Validate site config
-          if (data.id && data.name && data.domain) {
+          if (data && data.id && data.name && data.domain) {
             console.log('✅ Site Context: Config loaded and cached:', {
               id: data.id,
               name: data.name,
@@ -105,7 +143,7 @@ export function useSiteContext() {
               template: data.template
             })
             
-            // Cache the config
+            // Cache successful result
             siteConfigCache.set(hostname, data)
             
             setSiteConfig(data)
@@ -116,43 +154,59 @@ export function useSiteContext() {
             setError('Invalid site configuration')
           }
         } else {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-          console.log('❌ Site Context: API Error:', response.status, errorData)
+          console.log('❌ Site Context: API Error:', response.status)
+          
+          // Cache as failed lookup to prevent retries
+          siteConfigCache.set(hostname, null)
+          
           setSiteConfig(null)
-          setError(`API Error: ${response.status} - ${errorData.error}`)
+          setError(`Site not found (${response.status})`)
         }
       } catch (error) {
         console.error('❌ Site Context: Network error:', error)
+        
+        // Don't process if component unmounted
+        if (!mountedRef.current) return
+        
         setSiteConfig(null)
         setError('Network error')
       } finally {
-        setLoading(false)
-        fetchingRef.current = false
+        if (mountedRef.current) {
+          setLoading(false)
+          fetchingRef.current = false
+        }
       }
     }
 
-    // ENTERPRISE: Handle page visibility changes
+    // ENTERPRISE: Debounced page visibility handler
+    let visibilityTimeout: NodeJS.Timeout
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        const hostname = window.location.hostname
-        
-        // Only refresh if cache is old or missing
-        if (!siteConfigCache.has(hostname)) {
-          console.log('🔄 Site Context: Tab focus - cache miss, refreshing...')
-          fetchSiteContext()
-        } else {
-          console.log('⚡ Site Context: Tab focus - using cached config')
-        }
+        // Debounce to prevent rapid fire on tab switching
+        clearTimeout(visibilityTimeout)
+        visibilityTimeout = setTimeout(() => {
+          const hostname = window.location.hostname + ':' + window.location.port
+          
+          // Only refresh if cache is completely missing (not failed)
+          const cached = siteConfigCache.get(hostname)
+          if (!cached) {
+            console.log('🔄 Site Context: Tab focus - cache miss, refreshing...')
+            fetchSiteContext()
+          } else {
+            console.log('⚡ Site Context: Tab focus - using cached result')
+          }
+        }, 100)
       }
     }
 
     // Initial fetch
     fetchSiteContext()
 
-    // Listen for page visibility changes
+    // Listen for page visibility changes (debounced)
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
+      clearTimeout(visibilityTimeout)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, []) // Empty dependency array - only run once

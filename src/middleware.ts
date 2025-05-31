@@ -1,7 +1,55 @@
-// src/middleware.ts - FIXED VERSION
+// src/middleware.ts - ENTERPRISE OPTIMIZED VERSION
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getSiteByDomain } from '@/lib/supabase/tenant-client'
+
+// ENTERPRISE: In-memory cache for site lookups
+interface SiteCache {
+  siteConfig: any
+  timestamp: number
+  domain: string
+  isFailed?: boolean
+}
+
+class SiteCacheManager {
+  private cache = new Map<string, SiteCache>()
+  private readonly TTL = 10 * 60 * 1000 // 10 minutes
+  private readonly FAILURE_TTL = 2 * 60 * 1000 // 2 minutes for failures
+
+  set(domain: string, siteConfig: any | null, isFailed = false) {
+    this.cache.set(domain, {
+      siteConfig,
+      timestamp: Date.now(),
+      domain,
+      isFailed
+    })
+  }
+
+  get(domain: string): { siteConfig: any | null; isFailed: boolean } | null {
+    const cached = this.cache.get(domain)
+    if (!cached) return null
+
+    const ttl = cached.isFailed ? this.FAILURE_TTL : this.TTL
+    const isExpired = Date.now() - cached.timestamp > ttl
+
+    if (isExpired) {
+      this.cache.delete(domain)
+      return null
+    }
+
+    return { siteConfig: cached.siteConfig, isFailed: cached.isFailed || false }
+  }
+
+  has(domain: string): boolean {
+    return this.get(domain) !== null
+  }
+}
+
+const siteCache = new SiteCacheManager()
+
+// ENTERPRISE: Development mode configuration
+const isDevelopment = process.env.NODE_ENV === 'development'
+const LOCALHOST_DOMAINS = ['localhost:3000', 'localhost:3001', '127.0.0.1:3000']
 
 const ROUTE_ACCESS: Record<string, string[]> = {
   'directory': [
@@ -50,23 +98,13 @@ function isRouteAllowed(pathname: string, siteType: string): boolean {
   })
 }
 
-function isKnownNextRoute(pathname: string): boolean {
-  const knownRoutes = [
-    '/businesses', '/categories', '/search', '/about', '/contact',
-    '/dashboard', '/profile', '/login', '/register', '/auth', '/verify',
-    '/admin', '/api', '/debug', '/startup', '/saved', '/messages',
-    '/_next', '/favicon.ico', '/robots.txt', '/sitemap.xml'
+function shouldSkipSiteDetection(pathname: string): boolean {
+  const skipRoutes = [
+    '/api/', '/_next/', '/favicon.ico', '/robots.txt', '/sitemap.xml',
+    '/admin/login', '/login', '/register', '/auth/', '/verify', '/debug'
   ]
   
-  return knownRoutes.some(route => {
-    if (pathname === route) return true
-    if (pathname.startsWith(route + '/')) return true
-    return false
-  })
-}
-
-function isAuthRoute(pathname: string): boolean {
-  return ['/login', '/register', '/auth/verify', '/forgot-password'].includes(pathname)
+  return skipRoutes.some(route => pathname.startsWith(route))
 }
 
 function isProtectedRoute(pathname: string): boolean {
@@ -78,74 +116,99 @@ function isProtectedRoute(pathname: string): boolean {
   return protectedRoutes.some(route => pathname.startsWith(route))
 }
 
-// FIXED: Proper Supabase session detection
+function isAuthRoute(pathname: string): boolean {
+  return ['/login', '/register', '/auth/verify', '/forgot-password'].includes(pathname)
+}
+
+// ENTERPRISE: Optimized session detection
 function hasValidSession(request: NextRequest): boolean {
   try {
     const cookies = request.cookies.getAll()
-    console.log('🔍 Middleware: Checking for auth cookies...')
     
-    // Look for Supabase auth cookies with pattern: sb-{project-id}-auth-token
+    // Look for Supabase auth cookies
     const supabaseAuthCookie = cookies.find(cookie => 
       cookie.name.startsWith('sb-') && 
       cookie.name.endsWith('-auth-token') &&
       cookie.value && 
-      cookie.value.length > 100 // Valid tokens are long
+      cookie.value.length > 100
     )
     
-    if (!supabaseAuthCookie) {
-      console.log('❌ Middleware: No Supabase auth cookie found')
-      return false
-    }
-    
-    console.log('✅ Middleware: Found auth cookie:', supabaseAuthCookie.name.substring(0, 20) + '...')
+    if (!supabaseAuthCookie) return false
     
     try {
-      // Try to parse the cookie value
-      let authData
       const cookieValue = decodeURIComponent(supabaseAuthCookie.value)
+      let authData
       
-      // Handle both array format and object format
       if (cookieValue.startsWith('[')) {
-        // Array format: ["token", "refresh_token", null, null, null]
         const parsed = JSON.parse(cookieValue)
         if (Array.isArray(parsed) && parsed[0] && typeof parsed[0] === 'string') {
           authData = { access_token: parsed[0] }
         }
       } else if (cookieValue.startsWith('{')) {
-        // Object format: {"access_token": "...", "user": {...}}
         authData = JSON.parse(cookieValue)
       }
       
       if (authData?.access_token) {
-        // Basic JWT structure check
         const tokenParts = authData.access_token.split('.')
-        if (tokenParts.length === 3) {
-          console.log('✅ Middleware: Valid session detected')
-          return true
-        }
+        return tokenParts.length === 3
       }
       
-      console.log('❌ Middleware: Invalid token structure')
       return false
-      
-    } catch (parseError) {
-      console.log('❌ Middleware: Error parsing auth cookie:', parseError)
+    } catch {
       return false
     }
-    
-  } catch (error) {
-    console.log('❌ Middleware: Error checking session:', error)
+  } catch {
     return false
+  }
+}
+
+// ENTERPRISE: Optimized site lookup with caching
+async function getSiteConfigCached(hostname: string): Promise<any | null> {
+  const searchDomain = hostname.replace(/^www\./, '')
+  
+  // ENTERPRISE: Handle localhost in development
+  if (isDevelopment && LOCALHOST_DOMAINS.includes(searchDomain)) {
+    return {
+      id: 'localhost-dev',
+      name: 'Development Site',
+      domain: searchDomain,
+      site_type: 'directory',
+      template: 'modern',
+      settings: {},
+      is_active: true
+    }
+  }
+
+  // Check cache first
+  const cached = siteCache.get(searchDomain)
+  if (cached) {
+    return cached.siteConfig
+  }
+
+  try {
+    const siteConfig = await getSiteByDomain(searchDomain)
+    
+    // Cache successful result
+    siteCache.set(searchDomain, siteConfig, false)
+    
+    return siteConfig
+  } catch (error) {
+    console.log('⚠️ Middleware: Site lookup failed for', searchDomain)
+    
+    // Cache failure to prevent repeated lookups
+    siteCache.set(searchDomain, null, true)
+    
+    return null
   }
 }
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   
-  // Skip middleware for API routes, static files
-  if (pathname.startsWith('/api/') || 
-      pathname.startsWith('/_next/') || 
-      pathname.includes('.')) {
+  // ENTERPRISE: Skip middleware for static files and API routes (except auth)
+  if (pathname.startsWith('/_next/') || 
+      pathname.includes('.') ||
+      (pathname.startsWith('/api/') && !pathname.startsWith('/api/auth/'))) {
     return NextResponse.next()
   }
   
@@ -155,63 +218,62 @@ export async function middleware(request: NextRequest) {
     request: { headers: request.headers }
   })
 
-  // === SITE DETECTION ===
-  const hostname = request.headers.get('host') || ''
-  const searchDomain = hostname.replace(/^www\./, '')
-  
+  // === ENTERPRISE: SMART SITE DETECTION ===
   let siteConfig: any = null
   
-  try {
-    siteConfig = await getSiteByDomain(searchDomain)
-  } catch (error) {
-    console.log('⚠️ Middleware: Site lookup error for', searchDomain)
-  }
-
-  if (siteConfig) {
-    const siteType = siteConfig.site_type || 'directory'
+  // Only do site detection if we need it for route validation
+  if (!shouldSkipSiteDetection(pathname)) {
+    const hostname = request.headers.get('host') || ''
     
-    const skipRoutes = ['/admin', '/login', '/register', '/auth', '/verify', '/debug']
-    const shouldSkip = skipRoutes.some(route => pathname.startsWith(route))
-    
-    if (!shouldSkip) {
-      const isKnownRoute = isKnownNextRoute(pathname)
+    try {
+      siteConfig = await getSiteConfigCached(hostname)
       
-      if (isKnownRoute && !isRouteAllowed(pathname, siteType)) {
-        console.log('🚫 Middleware: Route not allowed for site type:', pathname, siteType)
-        return NextResponse.redirect(new URL('/', request.url))
-      } else if (!isKnownRoute) {
+      if (siteConfig) {
+        const siteType = siteConfig.site_type || 'directory'
+        
+        // Only validate routes if we have a site config
+        if (!isRouteAllowed(pathname, siteType)) {
+          console.log('🚫 Middleware: Route not allowed for site type:', pathname, siteType)
+          return NextResponse.redirect(new URL('/', request.url))
+        }
+        
+        // Set site headers for the application
+        response.headers.set('x-site-id', siteConfig.id)
+        response.headers.set('x-site-config', JSON.stringify(siteConfig))
+        response.headers.set('x-site-domain', siteConfig.domain)
+      } else {
+        // No site found - mark as potential CMS page for dynamic routing
         response.headers.set('x-potential-cms-page', 'true')
       }
+    } catch (error) {
+      console.error('❌ Middleware: Site detection error:', error)
+      // Continue without site config on error
     }
-    
-    response.headers.set('x-site-id', siteConfig.id)
-    response.headers.set('x-site-config', JSON.stringify(siteConfig))
-    response.headers.set('x-site-domain', siteConfig.domain)
   }
 
-  // === FIXED AUTH LOGIC ===
+  // === ENTERPRISE: SMART AUTH LOGIC ===
   const hasSession = hasValidSession(request)
-  console.log('🔐 Middleware: Session status:', hasSession ? 'AUTHENTICATED' : 'NOT AUTHENTICATED')
 
-  // If authenticated user tries to access auth pages, redirect to dashboard
-  if (hasSession && isAuthRoute(pathname)) {
-    console.log('🔄 Middleware: Authenticated user accessing auth page, redirecting to dashboard')
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
+  // Only check auth for routes that actually need it
+  if (isAuthRoute(pathname) || isProtectedRoute(pathname)) {
+    if (hasSession && isAuthRoute(pathname)) {
+      console.log('🔄 Middleware: Authenticated user accessing auth page, redirecting to dashboard')
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
 
-  // If unauthenticated user tries to access protected pages, redirect to login
-  if (!hasSession && isProtectedRoute(pathname)) {
-    console.log('🔄 Middleware: Unauthenticated user accessing protected route, redirecting to login')
-    
-    if (pathname.startsWith('/admin')) {
-      const redirectUrl = new URL('/admin/login', request.url)
+    if (!hasSession && isProtectedRoute(pathname)) {
+      console.log('🔄 Middleware: Unauthenticated user accessing protected route, redirecting to login')
+      
+      if (pathname.startsWith('/admin')) {
+        const redirectUrl = new URL('/admin/login', request.url)
+        redirectUrl.searchParams.set('redirect_to', pathname)
+        return NextResponse.redirect(redirectUrl)
+      }
+      
+      const redirectUrl = new URL('/login', request.url)
       redirectUrl.searchParams.set('redirect_to', pathname)
       return NextResponse.redirect(redirectUrl)
     }
-    
-    const redirectUrl = new URL('/login', request.url)
-    redirectUrl.searchParams.set('redirect_to', pathname)
-    return NextResponse.redirect(redirectUrl)
   }
 
   console.log('✅ Middleware: Allowing access to', pathname)
@@ -220,6 +282,13 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\..*|public).*)',
   ],
 }
