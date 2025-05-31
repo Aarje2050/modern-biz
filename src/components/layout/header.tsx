@@ -370,7 +370,7 @@ export default function Header() {
       </nav>
 
       {/* Mobile Padding for Bottom Nav - Increased for better spacing */}
-      <div className="md:hidden h-20"></div>
+      {/* <div className="md:hidden h-20"></div> */}
     </>
   )
 }
