@@ -76,10 +76,7 @@ interface BusinessMedia {
 }
 
 interface BusinessCategory {
-  category: {
-    name: string
-    slug: string
-  }[]
+  category: any // Flexible to handle Supabase type inference issues
 }
 
 interface Business {
@@ -154,9 +151,24 @@ function isCurrentlyOpen(businessHours: any): { isOpen: boolean; nextChange: str
   return { isOpen: false, nextChange: 'Closed today' }
 }
 
-// Server Components
+// Helper function to safely extract category data
+function getCategoryData(category: any): { name: string; slug: string } | null {
+  if (!category) return null
+  
+  // Handle if category is an array (Supabase type inference)
+  if (Array.isArray(category)) {
+    return category[0] || null
+  }
+  
+  // Handle if category is a single object (runtime reality)
+  if (category.name && category.slug) {
+    return category
+  }
+  
+  return null
+}
 function Breadcrumbs({ business, siteConfig }: { business: Business; siteConfig: any }) {
-  const category = business.categories?.[0]?.category?.[0]
+  const category = getCategoryData(business.categories?.[0]?.category)
   
   return (
     <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4 px-4 md:px-6 overflow-x-auto">
@@ -269,7 +281,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     }
   }
 
-  const category = business.categories?.[0]?.category?.[0]?.name
+  const categoryData = getCategoryData(business.categories?.[0]?.category)
+  const category = categoryData?.name
   const siteName = siteConfig?.name || 'Business Directory' // ADDED: Site name
   const location = siteConfig?.config?.location || '' // ADDED: Site location
   
@@ -431,17 +444,18 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
                   
                   {/* Categories & Verification */}
                   <div className="flex flex-wrap items-center gap-2 mb-3">
-                    {business.categories?.slice(0, 2).map((cat: BusinessCategory, idx: number) => 
-                      cat.category?.[0] ? (
+                    {business.categories?.slice(0, 2).map((cat: BusinessCategory, idx: number) => {
+                      const category = getCategoryData(cat.category)
+                      return category ? (
                         <Link
                           key={idx}
-                          href={`/categories/${cat.category[0].slug}`}
+                          href={`/categories/${category.slug}`}
                           className="inline-flex items-center px-2 py-1 bg-red-50 text-red-700 text-xs font-medium rounded-full hover:bg-red-100 transition-colors"
                         >
-                          {cat.category[0].name}
+                          {category.name}
                         </Link>
                       ) : null
-                    )}
+                    })}
                     
                     {business.verification_level !== 'none' && (
                       <span className="inline-flex items-center px-2 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-full">
@@ -708,9 +722,10 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
           name: business.name,
           description: business.description,
           short_description: business.short_description,
-          categories: business.categories?.flatMap((c: BusinessCategory) => 
-            c.category?.map(cat => cat.name) || []
-          ) || [],
+          categories: business.categories?.map((c: BusinessCategory) => {
+            const categoryData = getCategoryData(c.category)
+            return categoryData?.name
+          }).filter(Boolean) || [],
           locations: locations?.map(loc => ({
             address_line1: loc.address_line1,
             city: loc.city,
