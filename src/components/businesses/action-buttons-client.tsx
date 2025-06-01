@@ -1,8 +1,10 @@
 // src/components/businesses/action-buttons-client.tsx
+// ENHANCED VERSION - Only analytics tracking added to existing design
 'use client'
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { trackBusinessAction } from '@/lib/analytics/tracker'
 
 interface BusinessLocation {
   address_line1: string
@@ -33,6 +35,9 @@ export default function ActionButtons({
   const [shareText, setShareText] = useState('Share')
 
   const handleShare = async () => {
+    // Track share action
+    trackBusinessAction(business.id, 'share', { method: 'native' })
+    
     const url = window.location.href
     const title = business.name
     
@@ -53,6 +58,34 @@ export default function ActionButtons({
     }
   }
 
+  // Handle website click tracking
+  const handleWebsiteClick = () => {
+    trackBusinessAction(business.id, 'website_visit', { 
+      url: contactsByType.website 
+    })
+  }
+
+  // Handle save click tracking
+  const handleSaveClick = () => {
+    trackBusinessAction(business.id, 'save_business')
+  }
+
+  // Handle phone click tracking
+  const handlePhoneClick = () => {
+    trackBusinessAction(business.id, 'phone_call', { 
+      phone: contactsByType.phone 
+    })
+  }
+
+  // Handle directions click tracking
+  const handleDirectionsClick = () => {
+    if (primaryLocation) {
+      trackBusinessAction(business.id, 'get_directions', { 
+        address: `${primaryLocation.address_line1}, ${primaryLocation.city}, ${primaryLocation.state}`
+      })
+    }
+  }
+
   return (
     <div className={`grid gap-3 px-4 md:px-6 py-4 ${
       primaryLocation ? 'grid-cols-4' : 'grid-cols-3'
@@ -63,6 +96,7 @@ export default function ActionButtons({
           href={contactsByType.website}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={handleWebsiteClick}
           className="flex flex-col items-center justify-center p-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors mobile-touch-feedback business-action-button"
         >
           <div className="w-6 h-6 text-blue-600 mb-1">
@@ -80,6 +114,7 @@ export default function ActionButtons({
           ? `/api/save-business?id=${business.id}` 
           : `/login?redirect_to=${encodeURIComponent(`/businesses/${business.slug}`)}`
         }
+        onClick={handleSaveClick}
         className="flex flex-col items-center justify-center p-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors mobile-touch-feedback business-action-button"
       >
         <div className="w-6 h-6 text-red-600 mb-1">
@@ -111,6 +146,7 @@ export default function ActionButtons({
             ? `tel:${contactsByType.phone}` 
             : `/login?redirect_to=${encodeURIComponent(`/businesses/${business.slug}`)}`
           }
+          onClick={handlePhoneClick}
           className="flex flex-col items-center justify-center p-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors mobile-touch-feedback business-action-button"
         >
           <div className="w-6 h-6 text-emerald-600 mb-1">
@@ -130,6 +166,7 @@ export default function ActionButtons({
           )}`}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={handleDirectionsClick}
           className="flex flex-col items-center justify-center p-3 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors mobile-touch-feedback business-action-button"
         >
           <div className="w-6 h-6 text-purple-600 mb-1">

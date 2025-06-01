@@ -5,6 +5,8 @@ import { Metadata } from 'next'
 import AppProvider from '@/providers/app-provider'
 import SiteAwareLayout from '@/components/layout/SiteAwareLayout'
 import ClientLayout from './client-layout'
+import { Toaster } from 'react-hot-toast'
+
 
 // CRITICAL: Force dynamic rendering for multi-tenant architecture
 export const dynamic = 'force-dynamic'
@@ -58,6 +60,8 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth">
       <body className={`${inter.className} bg-gray-50`}>
         {/* FIXED: Using unified AppProvider instead of AuthProvider */}
+        <Toaster position="bottom-right" />
+
         <AppProvider>
           <SiteAwareLayout>
             <ClientLayout>

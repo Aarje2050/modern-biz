@@ -1,32 +1,15 @@
 // src/app/client-layout.tsx
+// FIXED VERSION - Remove old analytics, keep only essential functions
 'use client'
 
-import { usePathname } from 'next/navigation'
-import { useEffect } from 'react'
-import { track } from '@/lib/analytics'
 import EmailProcessorStarter from '@/components/email-processor-starter'
 
-function SimpleTracker() {
-  const pathname = usePathname()
-  
-  useEffect(() => {
-    if (pathname.startsWith('/businesses/')) {
-      const slug = pathname.split('/')[2]
-      if (slug) track.pageView('business', slug)
-    }
-    if (pathname.startsWith('/categories/')) {
-      const slug = pathname.split('/')[2] 
-      if (slug) track.pageView('category', slug)
-    }
-  }, [pathname])
-  
-  return null
-}
+// REMOVED: SimpleTracker component (causing duplicate tracking)
+// Page tracking is now handled by SimplePageTracker component on individual pages
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <SimpleTracker />
       <EmailProcessorStarter />
       {children}
     </>

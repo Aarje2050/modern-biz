@@ -1,8 +1,9 @@
-// src/components/search/simple-search-tracker.tsx (NEW FILE)
+// src/components/search/simple-search-tracker.tsx
+// FIXED VERSION - Use new analytics system
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { track } from '@/lib/analytics'
+import { trackSearch } from '@/lib/analytics/tracker'
 
 interface SimpleSearchTrackerProps {
   query: string | null
@@ -18,7 +19,7 @@ export default function SimpleSearchTracker({
   useEffect(() => {
     // Only track if there's a query and it's different from last tracked
     if (query && query.trim() && query !== lastTrackedQuery.current) {
-      track.search(query, resultCount)
+      trackSearch(query, resultCount)
       lastTrackedQuery.current = query
     }
   }, [query, resultCount])

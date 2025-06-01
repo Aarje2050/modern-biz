@@ -1,0 +1,182 @@
+## All tables, columns related to Analytics Schema :
+
+| table_name               | column_name        | data_type                | is_nullable | column_default     |
+| ------------------------ | ------------------ | ------------------------ | ----------- | ------------------ |
+| business_analytics_daily | id                 | uuid                     | NO          | uuid_generate_v4() |
+| business_analytics_daily | business_id        | uuid                     | YES         | null               |
+| business_analytics_daily | date               | date                     | NO          | null               |
+| business_analytics_daily | page_views         | integer                  | YES         | 0                  |
+| business_analytics_daily | unique_visitors    | integer                  | YES         | 0                  |
+| business_analytics_daily | contact_clicks     | integer                  | YES         | 0                  |
+| business_analytics_daily | direction_requests | integer                  | YES         | 0                  |
+| business_analytics_daily | profile_saves      | integer                  | YES         | 0                  |
+| business_analytics_daily | search_appearances | integer                  | YES         | 0                  |
+| business_analytics_daily | review_count       | integer                  | YES         | 0                  |
+| business_analytics_daily | avg_rating         | numeric                  | YES         | 0                  |
+| business_analytics_daily | computed_at        | timestamp with time zone | YES         | now()              |
+| business_analytics_daily | created_at         | timestamp with time zone | YES         | now()              |
+| business_interactions    | id                 | uuid                     | NO          | uuid_generate_v4() |
+| business_interactions    | business_id        | uuid                     | YES         | null               |
+| business_interactions    | profile_id         | uuid                     | YES         | null               |
+| business_interactions    | interaction_type   | text                     | NO          | null               |
+| business_interactions    | metadata           | jsonb                    | YES         | '{}'::jsonb        |
+| business_interactions    | created_at         | timestamp with time zone | YES         | now()              |
+| business_views           | id                 | uuid                     | NO          | uuid_generate_v4() |
+| business_views           | business_id        | uuid                     | YES         | null               |
+| business_views           | profile_id         | uuid                     | YES         | null               |
+| business_views           | view_type          | text                     | NO          | null               |
+| business_views           | source             | text                     | YES         | null               |
+| business_views           | created_at         | timestamp with time zone | YES         | now()              |
+| page_views               | id                 | uuid                     | NO          | uuid_generate_v4() |
+| page_views               | entity_type        | text                     | NO          | null               |
+| page_views               | entity_id          | uuid                     | NO          | null               |
+| page_views               | session_id         | text                     | YES         | null               |
+| page_views               | ip_address         | text                     | YES         | null               |
+| page_views               | user_agent         | text                     | YES         | null               |
+| page_views               | referrer           | text                     | YES         | null               |
+| page_views               | created_at         | timestamp with time zone | YES         | now()              |
+| page_views               | profile_id         | uuid                     | YES         | null               |
+| page_views               | ip_hash            | text                     | YES         | null               |
+| page_views               | url                | text                     | YES         | null               |
+| search_queries           | id                 | uuid                     | NO          | uuid_generate_v4() |
+| search_queries           | profile_id         | uuid                     | YES         | null               |
+| search_queries           | query              | text                     | NO          | null               |
+| search_queries           | filters            | jsonb                    | YES         | '{}'::jsonb        |
+| search_queries           | result_count       | integer                  | YES         | null               |
+| search_queries           | created_at         | timestamp with time zone | YES         | now()              |
+| search_queries           | metadata           | jsonb                    | YES         | '{}'::jsonb        |
+| user_events              | id                 | uuid                     | NO          | uuid_generate_v4() |
+| user_events              | profile_id         | uuid                     | YES         | null               |
+| user_events              | event_type         | text                     | NO          | null               |
+| user_events              | entity_type        | text                     | YES         | null               |
+| user_events              | entity_id          | uuid                     | YES         | null               |
+| user_events              | data               | jsonb                    | YES         | '{}'::jsonb        |
+| user_events              | created_at         | timestamp with time zone | YES         | now()              |
+
+
+## RLS Policies related to analytics schema 
+
+| policy_name                                          | table_name               | schema_name | is_permissive | roles | command | using_expression                                                                                                  | with_check_expression                 |
+| ---------------------------------------------------- | ------------------------ | ----------- | ------------- | ----- | ------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Business owners can view their analytics             | business_analytics_daily | analytics   | true          | [0]   | r       | (business_id IN ( SELECT businesses.id
+   FROM listings.businesses
+  WHERE (businesses.profile_id = auth.uid()))) | null                                  |
+| Service role can manage analytics                    | business_analytics_daily | analytics   | true          | [0]   | *       | (auth.role() = 'service_role'::text)                                                                              | null                                  |
+| Authenticated users can insert analytics             | business_analytics_daily | analytics   | true          | [0]   | a       | null                                                                                                              | (auth.role() = 'authenticated'::text) |
+| Public can read page_views                           | page_views               | analytics   | true          | [0]   | r       | true                                                                                                              | null                                  |
+| Authenticated users can insert page_views            | page_views               | analytics   | true          | [0]   | a       | null                                                                                                              | (auth.role() = 'authenticated'::text) |
+| Public can read business_interactions                | business_interactions    | analytics   | true          | [0]   | r       | true                                                                                                              | null                                  |
+| Authenticated users can insert business_interactions | business_interactions    | analytics   | true          | [0]   | a       | null                                                                                                              | (auth.role() = 'authenticated'::text) |
+| Public can read search_queries                       | search_queries           | analytics   | true          | [0]   | r       | true                                                                                                              | null                                  |
+| Authenticated users can insert search_queries        | search_queries           | analytics   | true          | [0]   | a       | null                                                                                                              | (auth.role() = 'authenticated'::text) |
+
+
+
+
+## COMPLETE SCHEMAs in our Database : 
+
+#ALL AVAILABLE SCHEMAS in our DATABASE.
+
+
+| schema_name        |
+| ------------------ |
+| analytics          |
+| auth               |
+| core               |
+| crm                |
+| extensions         |
+| graphql            |
+| graphql_public     |
+| information_schema |
+| listings           |
+| messaging          |
+| notifications      |
+| payments           |
+| pg_catalog         |
+| pg_temp_11         |
+| pg_temp_12         |
+| pg_temp_13         |
+| pg_temp_14         |
+| pg_temp_15         |
+| pg_temp_16         |
+| pg_temp_17         |
+| pg_temp_18         |
+| pg_temp_20         |
+| pg_temp_21         |
+| pg_temp_22         |
+| pg_temp_23         |
+| pg_temp_24         |
+| pg_temp_25         |
+| pg_temp_26         |
+| pg_temp_27         |
+| pg_temp_28         |
+| pg_temp_29         |
+| pg_temp_30         |
+| pg_temp_31         |
+| pg_temp_32         |
+| pg_temp_33         |
+| pg_temp_34         |
+| pg_temp_35         |
+| pg_temp_36         |
+| pg_temp_37         |
+| pg_temp_38         |
+| pg_temp_39         |
+| pg_temp_40         |
+| pg_temp_41         |
+| pg_temp_42         |
+| pg_temp_43         |
+| pg_temp_44         |
+| pg_temp_46         |
+| pg_temp_7          |
+| pg_temp_8          |
+| pg_temp_9          |
+| pg_toast           |
+| pg_toast_temp_11   |
+| pg_toast_temp_12   |
+| pg_toast_temp_13   |
+| pg_toast_temp_14   |
+| pg_toast_temp_15   |
+| pg_toast_temp_16   |
+| pg_toast_temp_17   |
+| pg_toast_temp_18   |
+| pg_toast_temp_20   |
+| pg_toast_temp_21   |
+| pg_toast_temp_22   |
+| pg_toast_temp_23   |
+| pg_toast_temp_24   |
+| pg_toast_temp_25   |
+| pg_toast_temp_26   |
+| pg_toast_temp_27   |
+| pg_toast_temp_28   |
+| pg_toast_temp_29   |
+| pg_toast_temp_30   |
+| pg_toast_temp_31   |
+| pg_toast_temp_32   |
+| pg_toast_temp_33   |
+| pg_toast_temp_34   |
+| pg_toast_temp_35   |
+| pg_toast_temp_36   |
+| pg_toast_temp_37   |
+| pg_toast_temp_38   |
+| pg_toast_temp_39   |
+| pg_toast_temp_40   |
+| pg_toast_temp_41   |
+| pg_toast_temp_42   |
+| pg_toast_temp_43   |
+| pg_toast_temp_44   |
+| pg_toast_temp_46   |
+| pg_toast_temp_7    |
+| pg_toast_temp_8    |
+| pg_toast_temp_9    |
+| pgbouncer          |
+| public             |
+| realtime           |
+| reviews            |
+| storage            |
+| vault              |
+
+
+
+
+
+

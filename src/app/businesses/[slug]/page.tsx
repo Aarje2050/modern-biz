@@ -7,6 +7,10 @@ import { formatDate } from '@/lib/utils/formatting'
 import { getCurrentSite } from '@/lib/site-context' // ADDED: Site context
 import dynamic from 'next/dynamic'
 import type { Metadata } from 'next'
+import SimplePageTracker from '@/components/analytics/SimplePageTracker'
+
+
+
 
 // Client Components
 const ContactInfo = dynamic(() => import('@/components/businesses/contact-info'), {
@@ -510,12 +514,12 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
       {/* Action Buttons */}
       <div className="bg-gray-50 border-t">
         <div className="max-w-7xl mx-auto">
-          <ActionButtons 
-            business={business}
-            contactsByType={contactsByType}
-            primaryLocation={primaryLocation}
-            session={session}
-          />
+        <ActionButtons
+  business={business}
+  contactsByType={contactsByType}
+  primaryLocation={primaryLocation}
+  session={session}
+/>
         </div>
       </div>
 
@@ -734,6 +738,7 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
           business_contacts: contacts?.map(c => ({ type: c.type, value: c.value }))
         }} />
       </div>
+      <SimplePageTracker entityType="business" entityId={business.slug} />
     </div>
   )
 }

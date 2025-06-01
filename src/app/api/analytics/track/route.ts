@@ -1,14 +1,12 @@
-// src/app/api/analytics/track/route.ts (MINIMAL APPROACH)
+// src/app/api/analytics/track/route.ts - SIMPLE WORKING VERSION
 import { NextResponse } from 'next/server'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 
 export async function POST(request: Request) {
-  let body: any = {}
-  
   try {
     const supabase = createRouteHandlerClient({ cookies })
-    body = await request.json()
+    const body = await request.json()
     
     const { 
       type, 
@@ -17,16 +15,16 @@ export async function POST(request: Request) {
       businessId, 
       interactionType, 
       query, 
-      result_count
+      resultCount
     } = body
     
     const { data: { session } } = await supabase.auth.getSession()
     const timestamp = new Date().toISOString()
     
-    console.log('Tracking request:', { type, entityType, entityId })
+    console.log('📊 Analytics tracking:', { type, query, businessId, entityType })
     
+    // Handle page views
     if (type === 'page_view' && entityType && entityId) {
-      // Get UUID from slug
       const table = entityType === 'business' ? 'businesses' : 'categories'
       const { data: entity } = await supabase
         .from(table)
@@ -35,117 +33,95 @@ export async function POST(request: Request) {
         .single()
       
       if (entity) {
-        // Try full insert first, fallback to minimal
-        try {
-          const { error: fullInsertError } = await supabase
-            .from('page_views')
-            .insert({
-              entity_type: entityType,
-              entity_id: entity.id,
-              url: request.headers.get('referer') || '',
-              referrer: request.headers.get('referer') || '',
-              user_agent: request.headers.get('user-agent') || '',
-              profile_id: session?.user?.id || null,
-              ip_address: getClientIP(request),
-              ip_hash: generateIPHash(request),
-              session_id: generateSessionId(),
-              created_at: timestamp
-            })
-          
-          if (fullInsertError) {
-            console.log('Full insert failed, trying minimal:', fullInsertError)
-            
-            // Fallback to minimal insert
-            const { error: minimalError } = await supabase
-              .from('page_views')
-              .insert({
-                entity_type: entityType,
-                entity_id: entity.id,
-                url: request.headers.get('referer') || '',
-                profile_id: session?.user?.id || null,
-                created_at: timestamp
-              })
-            
-            if (minimalError) {
-              throw minimalError
-            }
-            
-            console.log('Minimal page view insert successful')
-          } else {
-            console.log('Full page view insert successful')
-          }
-        } catch (insertError) {
-          console.error('Both insert attempts failed:', insertError)
-          throw insertError
+        const { error } = await supabase
+          .from('page_views')
+          .insert({
+            entity_type: entityType,
+            entity_id: entity.id,
+            url: request.headers.get('referer') || '',
+            profile_id: session?.user?.id || null,
+            created_at: timestamp
+          })
+        
+        if (error) {
+          console.error('Page view error:', error)
+        } else {
+          console.log('✅ Page view tracked')
         }
       }
     }
     
+    // Handle business interactions
     if (type === 'business_interaction' && businessId && interactionType) {
-      const { error: interactionError } = await supabase
+      // Convert slug to UUID if needed
+      let businessUuid = businessId
+      if (!businessId.includes('-')) {
+        const { data: business } = await supabase
+          .from('businesses')
+          .select('id')
+          .eq('slug', businessId)
+          .single()
+        
+        if (business) {
+          businessUuid = business.id
+        }
+      }
+      
+      const { error } = await supabase
         .from('business_interactions')
         .insert({
-          business_id: businessId,
+          business_id: businessUuid,
           interaction_type: interactionType,
           profile_id: session?.user?.id || null,
           created_at: timestamp
         })
       
-      if (interactionError) {
-        console.error('Business interaction error:', interactionError)
-        throw interactionError
+      if (error) {
+        console.error('Business interaction error:', error)
+      } else {
+        console.log('✅ Business interaction tracked')
       }
-      
-      console.log('Business interaction successful')
     }
     
+    // Handle search queries - FIXED VERSION
     if (type === 'search' && query) {
-      const { error: searchError } = await supabase
+      console.log('🔍 Processing search:', { query, resultCount })
+      
+      const { error } = await supabase
         .from('search_queries')
         .insert({
           query: query.trim(),
-          result_count: result_count || 0,
+          result_count: resultCount || 0,
           profile_id: session?.user?.id || null,
           created_at: timestamp
         })
       
-      if (searchError) {
-        console.error('Search tracking error:', searchError)
-        throw searchError
+      if (error) {
+        console.error('❌ Search query error:', error)
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details
+        })
+        
+        // Still return success to not break user experience
+        return NextResponse.json({ 
+          success: true, 
+          type: 'search',
+          error: error.message 
+        })
+      } else {
+        console.log('✅ Search query tracked successfully')
       }
-      
-      console.log('Search tracking successful')
     }
     
     return NextResponse.json({ success: true, type })
     
   } catch (error) {
-    console.error('Analytics tracking error:', error)
+    console.error('Analytics API error:', error)
     return NextResponse.json({ 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error',
-      type: body?.type || 'unknown'
-    }, { status: 500 })
+      success: true, // Always return success to not break user experience
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 200 })
   }
-}
-
-function getClientIP(request: Request): string {
-  return request.headers.get('x-forwarded-for') || 
-         request.headers.get('x-real-ip') || 
-         'unknown'
-}
-
-function generateIPHash(request: Request): string {
-  const ip = getClientIP(request)
-  let hash = 0
-  for (let i = 0; i < ip.length; i++) {
-    const char = ip.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash = hash & hash
-  }
-  return 'hash_' + Math.abs(hash).toString(36)
-}
-
-function generateSessionId(): string {
-  return 'sess_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now().toString(36)
 }
