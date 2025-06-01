@@ -21,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
       default: 'BusinessDir - Find Local Business Services',
     },
     description: 'Discover and connect with local business services in your area.',
-    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://rajeshjat.com'),
     keywords: ['business directory', 'local services', 'reviews', 'business listings'],
     authors: [{ name: 'BusinessDir' }],
     creator: 'BusinessDir',
