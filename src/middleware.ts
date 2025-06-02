@@ -41,7 +41,7 @@ const ROUTE_ACCESS: Record<string, string[]> = {
     '/', '/businesses', '/businesses/*', '/categories', '/categories/*', 
     '/search', '/about', '/contact', '/dashboard', '/dashboard/*', 
     '/profile', '/messages', '/messages/*', '/saved', '/reviews',
-    '/login', '/register', '/auth/*', '/admin', '/admin/*'
+    '/login', '/register', '/auth/*'
   ],
   'landing': [
     '/', '/about', '/contact'
@@ -129,9 +129,8 @@ function createDevSiteHeaders(): Record<string, string> {
 }
 
 function log(message: string, data?: any) {
-  if (isDev) {
-    console.log(`🛡️ [MIDDLEWARE] ${message}`, data || '')
-  }
+  // Always log in production for debugging
+  console.log(`🛡️ [MIDDLEWARE] ${message}`, data || '')
 }
 
 // ===============================
@@ -140,9 +139,14 @@ function log(message: string, data?: any) {
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+  const hostname = request.headers.get('host') || ''
+  
+  // Always log in production for debugging
+  console.log(`🛡️ [MIDDLEWARE-START] ${hostname}${pathname}`)
   
   // Skip middleware for static files and API routes
   if (shouldSkipMiddleware(pathname)) {
+    console.log(`🛡️ [MIDDLEWARE-SKIP] ${pathname}`)
     return NextResponse.next()
   }
   
@@ -157,17 +161,17 @@ export async function middleware(request: NextRequest) {
   // SITE HEADERS - TRY DATABASE FIRST
   // ===============================
   
-  const hostname = request.headers.get('host') || ''
-  
   try {
     // Always try to get real site from database
     const { getSiteByDomain } = await import('@/lib/supabase/tenant-client')
     const searchDomain = hostname.replace(/^www\./, '')
+    
+    console.log(`🛡️ [MIDDLEWARE-LOOKUP] Searching for domain: ${searchDomain}`)
     const siteConfig = await getSiteByDomain(searchDomain)
     
     if (siteConfig) {
       // Real site found - set real headers
-      log(`Real site found: ${siteConfig.name}`)
+      console.log(`🛡️ [MIDDLEWARE-FOUND] Site: ${siteConfig.name}, Type: ${(siteConfig as any).site_type}`)
       response.headers.set('x-site-id', siteConfig.id)
       response.headers.set('x-site-config', JSON.stringify(siteConfig))
       response.headers.set('x-site-domain', siteConfig.domain)
@@ -177,29 +181,24 @@ export async function middleware(request: NextRequest) {
       // ===============================
       
       const siteType = (siteConfig as any).site_type || 'directory'
+      const routeAllowed = isRouteAllowedForSiteType(pathname, siteType)
       
-      if (!isRouteAllowedForSiteType(pathname, siteType)) {
-        log(`Route ${pathname} not allowed for site type ${siteType}`)
+      console.log(`🛡️ [MIDDLEWARE-ROUTE] Path: ${pathname}, SiteType: ${siteType}, Allowed: ${routeAllowed}`)
+      
+      if (!routeAllowed) {
+        console.log(`🛡️ [MIDDLEWARE-REDIRECT] Route ${pathname} not allowed for site type ${siteType}`)
         return NextResponse.redirect(new URL('/', request.url))
       }
       
     } else {
-      // No real site - use dev fallback only for localhost in dev
-      if (isDev && LOCALHOST_DOMAINS.includes(hostname)) {
-        log('Using dev fallback for localhost')
-        const devHeaders = createDevSiteHeaders()
-        Object.entries(devHeaders).forEach(([key, value]) => {
-          response.headers.set(key, value)
-        })
-      } else {
-        // Production domain with no site config
-        log(`No site found for domain: ${hostname}`)
-        response.headers.set('x-site-domain', hostname)
-      }
+      // TEMPORARY: No site found - log and allow (don't redirect)
+      console.log(`🛡️ [MIDDLEWARE-NOTFOUND] No site found for domain: ${searchDomain}`)
+      response.headers.set('x-site-domain', hostname)
+      // Don't redirect - just continue
     }
   } catch (error) {
     // Database error - fallback
-    log('Database error, using domain header only')
+    console.log(`🛡️ [MIDDLEWARE-ERROR] Database error:`, error)
     response.headers.set('x-site-domain', hostname)
   }
 
@@ -208,23 +207,23 @@ export async function middleware(request: NextRequest) {
   // ===============================
   
   const hasSession = hasValidAuthCookie(request)
-  log(`Auth status: ${hasSession ? 'authenticated' : 'not authenticated'}`)
+  console.log(`🛡️ [MIDDLEWARE-AUTH] Auth status: ${hasSession ? 'authenticated' : 'not authenticated'}`)
 
   // Handle auth routes (login, register, etc.)
   if (isAuthRoute(pathname)) {
     if (hasSession) {
-      log('Authenticated user accessing auth page - redirecting to dashboard')
+      console.log(`🛡️ [MIDDLEWARE-AUTH-REDIRECT] Authenticated user accessing auth page, redirecting to dashboard`)
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
     // Not authenticated and accessing auth page - allow
-    log('Not authenticated, allowing access to auth page')
+    console.log(`🛡️ [MIDDLEWARE-AUTH-ALLOW] Not authenticated, allowing access to auth page`)
     return response
   }
 
   // Handle protected routes
   if (isProtectedRoute(pathname)) {
     if (!hasSession) {
-      log('Not authenticated, redirecting to login')
+      console.log(`🛡️ [MIDDLEWARE-PROTECT-REDIRECT] Not authenticated, redirecting to login`)
       
       if (pathname.startsWith('/admin')) {
         const redirectUrl = new URL('/admin/login', request.url)
@@ -238,12 +237,12 @@ export async function middleware(request: NextRequest) {
     }
     
     // Authenticated and accessing protected route - allow
-    log('Authenticated, allowing access to protected route')
+    console.log(`🛡️ [MIDDLEWARE-PROTECT-ALLOW] Authenticated, allowing access to protected route`)
     return response
   }
 
   // Public route - allow
-  log('Public route, allowing access')
+  console.log(`🛡️ [MIDDLEWARE-ALLOW] Public route, allowing access`)
   return response
 }
 
