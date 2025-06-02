@@ -8,6 +8,8 @@ import { getCurrentSite } from '@/lib/site-context' // ADDED: Site context
 import dynamic from 'next/dynamic'
 import type { Metadata } from 'next'
 import SimplePageTracker from '@/components/analytics/SimplePageTracker'
+import { businessMetadata } from '@/lib/seo/helpers'
+
 
 
 
@@ -290,25 +292,34 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const siteName = siteConfig?.name || 'Business Directory' // ADDED: Site name
   const location = siteConfig?.config?.location || '' // ADDED: Site location
   
-  const title = `${business.name}${category ? ` - ${category}` : ''}${location ? ` in ${location}` : ''} | ${siteName}`
-  const description =  `Learn more about ${business.name}, a trusted local business.`
-  
-  return {
-    title,
-    description,
-    keywords: `${business.name}, ${category || 'business'}, ${location}, reviews, contact`,
-    openGraph: {
-      title,
-      description,
-      type: 'website',
-      url: `/businesses/${params.slug}`,
-      siteName,
-      images: business.logo_url ? [{ url: business.logo_url, alt: `${business.name} logo` }] : undefined,
-    },
-    alternates: {
-      canonical: `/businesses/${params.slug}`,
-    }
+  // ✅ ADD THIS (template-powered)
+const businessData = {
+  name: business.name,
+  description: business.short_description || business.description,
+  city: location, // or get from business location data if you have it
+  state: '', // add if you have state data
+  slug: params.slug,
+  category: category
+}
+
+// Get template-generated title and description
+const seoData = businessMetadata(businessData, {
+  title: business.name +' | ' +'Reviews & Contact Info',
+  description: "Custom description for this special case"
+})
+
+// ✅ FIXED (Handle null values)
+return {
+  ...seoData,
+  openGraph: {
+    title: seoData.title || business.name, // Fallback if null
+    description: seoData.description || `Learn about ${business.name}`, // Fallback if null
+    type: 'website',
+    url: `/businesses/${params.slug}`,
+    siteName,
+    images: business.logo_url ? [{ url: business.logo_url, alt: `${business.name} logo` }] : undefined,
   }
+}
 }
 
 export const revalidate = 600

@@ -1,5 +1,7 @@
-// src/app/categories/[slug]/page.tsx
+// src/app/categories/[slug]/page.tsx - ENHANCED VERSION (MINIMAL CHANGES)
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentSite } from '@/lib/site-context' // ADD THIS
+import { categoryMetadata } from '@/lib/seo/helpers' // ADD THIS
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import BusinessCard from '@/components/businesses/business-card'
@@ -8,13 +10,18 @@ import Pagination from '@/components/ui/pagination'
 // Number of results per page
 const PAGE_SIZE = 12
 
+// ===============================
+// ONLY CHANGE: Enhanced generateMetadata
+// ===============================
 export async function generateMetadata({ params }: { params: { slug: string } }) {
+  const siteConfig = getCurrentSite() // ADD THIS
   const supabase = await createClient()
   
   const { data: category } = await supabase
     .from('categories')
     .select('name, description')
     .eq('slug', params.slug)
+    .eq('site_id', siteConfig?.id) // ADD SITE FILTER
     .single()
     
   if (!category) {
@@ -24,12 +31,26 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     }
   }
   
-  return {
-    title: `${category.name} - Business Directory`,
-    description: category.description || `Browse ${category.name} businesses in our directory`,
-  }
+  // ✨ REPLACE OLD METADATA WITH THIS ONE LINE ✨
+  return categoryMetadata({
+    name: category.name,
+    slug: params.slug,
+    description: category.description,
+    // businessCount will be calculated automatically
+  })
+
+  // OLD CODE (REMOVE THIS):
+  // return {
+  //   title: `${category.name} - Business Directory`,
+  //   description: category.description || `Browse ${category.name} businesses in our directory`,
+  // }
 }
+
 export const revalidate = 600;
+
+// ===============================
+// REST OF YOUR CODE STAYS EXACTLY THE SAME
+// ===============================
 export default async function CategoryPage({ 
   params,
   searchParams
@@ -37,14 +58,16 @@ export default async function CategoryPage({
   params: { slug: string }
   searchParams: { page?: string }
 }) {
+  const siteConfig = getCurrentSite() // ADD THIS LINE
   const supabase = await createClient()
   const currentPage = searchParams.page ? parseInt(searchParams.page, 10) : 1
   
-  // Get the category
+  // Get the category (ADD SITE FILTER)
   const { data: category, error } = await supabase
     .from('categories')
     .select('*')
     .eq('slug', params.slug)
+    .eq('site_id', siteConfig?.id) // ADD THIS
     .single()
   
   if (error || !category) {
@@ -67,11 +90,12 @@ export default async function CategoryPage({
   
   if (businessIds && businessIds.length > 0) {
     for (const { business_id } of businessIds) {
-      // Get business details
+      // Get business details (ADD SITE FILTER)
       const { data: business } = await supabase
         .from('businesses')
         .select('id, name, slug, short_description, logo_url')
         .eq('id', business_id)
+        .eq('site_id', siteConfig?.id) // ADD THIS
         .eq('status', 'active')
         .single()
       
@@ -97,6 +121,9 @@ export default async function CategoryPage({
   // Calculate total pages
   const totalPages = Math.ceil((totalBusinesses || 0) / PAGE_SIZE)
   
+  // ===============================
+  // YOUR EXISTING UI - NO CHANGES
+  // ===============================
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
