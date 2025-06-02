@@ -731,7 +731,7 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
       </div>
       
       {/* AI Assistant - Positioned correctly above mobile nav */}
-      <div className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-40">
+      {/* <div className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-40">
         <BusinessAssistant business={{
           id: business.id,
           name: business.name,
@@ -748,7 +748,7 @@ export default async function BusinessDetailPage({ params }: { params: { slug: s
           })),
           business_contacts: contacts?.map(c => ({ type: c.type, value: c.value }))
         }} />
-      </div>
+      </div> */}
       <SimplePageTracker entityType="business" entityId={business.slug} />
     </div>
   )
