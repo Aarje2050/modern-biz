@@ -1,13 +1,16 @@
-// src/components/layout/SiteAwareLayout.tsx (MINIMAL FIX - Keep your existing code)
+// src/components/layout/SiteAwareLayout.tsx (UPDATED WITH TAWK.TO)
 'use client'
 import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
+import TawkToWidget from '@/components/chat/tawk-to-widget'
 
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react' // ADD THIS
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 
-// ADD THIS: Safe hook wrapper to prevent provider errors
+// Tawk.to is now configured per-site in config/tawk-config.ts
+
+// Safe hook wrapper to prevent provider errors
 function useSafeAuth() {
   const [mounted, setMounted] = useState(false)
   
@@ -24,9 +27,9 @@ function useSafeAuth() {
   }
 }
 
-// Directory header (your existing header functionality) - ONLY CHANGED: useSiteAuth → useSafeAuth
+// Directory header (your existing header functionality)
 function DirectoryHeader() {
-  const { user, isAuthenticated, signOut } = useSafeAuth() // CHANGED THIS LINE
+  const { user, isAuthenticated, signOut } = useSafeAuth()
   
   return (
     <header className="bg-white shadow-sm border-b">
@@ -80,9 +83,9 @@ function DirectoryHeader() {
   )
 }
 
-// Landing page header - ONLY CHANGED: useSiteAuth → useSafeAuth
+// Landing page header
 function LandingHeader({ siteName, primaryColor }: { siteName: string, primaryColor: string }) {
-  const { user, isAuthenticated, signOut } = useSafeAuth() // CHANGED THIS LINE
+  const { user, isAuthenticated, signOut } = useSafeAuth()
   
   return (
     <header className="bg-white shadow-sm">
@@ -126,9 +129,9 @@ function LandingHeader({ siteName, primaryColor }: { siteName: string, primaryCo
   )
 }
 
-// Service business header - ONLY CHANGED: useSiteAuth → useSafeAuth
+// Service business header
 function ServiceHeader({ siteName, primaryColor, location }: { siteName: string, primaryColor: string, location?: string }) {
-  const { user, isAuthenticated, signOut } = useSafeAuth() // CHANGED THIS LINE
+  const { user, isAuthenticated, signOut } = useSafeAuth()
   
   return (
     <header className="bg-white shadow-sm">
@@ -181,7 +184,7 @@ function ServiceHeader({ siteName, primaryColor, location }: { siteName: string,
   )
 }
 
-// Directory footer (your existing footer) - NO CHANGES
+// Directory footer (your existing footer)
 function DirectoryFooter() {
   return (
     <footer className="bg-gray-900 text-white">
@@ -223,7 +226,7 @@ function DirectoryFooter() {
   )
 }
 
-// Landing/Service footer - NO CHANGES
+// Landing/Service footer
 function SimpleFooter({ siteName }: { siteName: string }) {
   return (
     <footer className="bg-gray-900 text-white">
@@ -248,10 +251,10 @@ interface SiteAwareLayoutProps {
   children: React.ReactNode
 }
 
-// Main component - ONLY CHANGED: useSiteAuth → useSafeAuth
+// Main component with Tawk.to integration
 export default function SiteAwareLayout({ children }: SiteAwareLayoutProps) {
   const { siteConfig, loading } = useSiteContext()
-  const { loading: authLoading } = useSafeAuth() // CHANGED THIS LINE
+  const { loading: authLoading } = useSafeAuth()
   const pathname = usePathname()
   
   // Skip layout for admin and API routes
@@ -274,6 +277,8 @@ export default function SiteAwareLayout({ children }: SiteAwareLayoutProps) {
         <Header />
         {children}
         <DirectoryFooter />
+        {/* Tawk.to Widget - Auto-configured per site */}
+        <TawkToWidget />
       </>
     )
   }
@@ -290,6 +295,8 @@ export default function SiteAwareLayout({ children }: SiteAwareLayoutProps) {
         <LandingHeader siteName={siteName} primaryColor={primaryColor} />
         {children}
         <SimpleFooter siteName={siteName} />
+        {/* Tawk.to Widget - Auto-configured per site */}
+        <TawkToWidget />
       </>
     )
   }
@@ -301,6 +308,8 @@ export default function SiteAwareLayout({ children }: SiteAwareLayoutProps) {
         <ServiceHeader siteName={siteName} primaryColor={primaryColor} location={location} />
         {children}
         <SimpleFooter siteName={siteName} />
+        {/* Tawk.to Widget - Auto-configured per site */}
+        <TawkToWidget />
       </>
     )
   }
@@ -311,6 +320,8 @@ export default function SiteAwareLayout({ children }: SiteAwareLayoutProps) {
       <DirectoryHeader />
       {children}
       <DirectoryFooter />
+      {/* Tawk.to Widget - Auto-configured per site */}
+      <TawkToWidget />
     </>
   )
 }
