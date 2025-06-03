@@ -2,6 +2,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
 
+  // Prevent trailing slash redirects
+  trailingSlash: false,
+
   async redirects() {
     return [
       // Redirect old WordPress listings to new businesses URLs
