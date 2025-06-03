@@ -6,7 +6,7 @@ const nextConfig = {
     return [
       // Redirect old WordPress listings to new businesses URLs
       {
-        source: '/listings/:slug*',
+        source: '/listing/:slug*',
         destination: '/businesses/:slug*',
         permanent: true, // 301 redirect for SEO
       },
