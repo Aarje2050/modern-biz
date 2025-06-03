@@ -119,8 +119,19 @@ export class SEOService {
     }
     
     // Handle custom domains (assume HTTPS)
-    return `https://${domain}`
+  // FIXED: Add www. prefix if not present and not localhost/staging
+  let finalDomain = domain
+  
+  // Add www. if domain doesn't already have it and is a custom domain
+  if (!finalDomain.startsWith('www.') && 
+      !finalDomain.includes('localhost') && 
+      !finalDomain.includes('vercel.app') && 
+      !finalDomain.includes('netlify.app')) {
+    finalDomain = `www.${domain}`
   }
+  
+  return `https://${finalDomain}`
+}
 
   // ===============================
   // FOCUSED METADATA GENERATION (LENGTH-CONTROLLED)
