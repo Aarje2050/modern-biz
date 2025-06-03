@@ -19,7 +19,11 @@ const nextConfig = {
     ]
   },
   images: {
-    domains: ['krmmxfmvssmzcmbitvil.supabase.co', 'ductcleaningca.com'],
+    domains: [
+      'krmmxfmvssmzcmbitvil.supabase.co', 
+      'ductcleaningca.com',
+      'www.ductcleaningca.com'  // Add this line
+    ],
   },
 
   webpack: (config, { isServer }) => {
