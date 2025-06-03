@@ -41,7 +41,7 @@ const ROUTE_ACCESS: Record<string, string[]> = {
     '/', '/businesses', '/businesses/*', '/categories', '/categories/*', 
     '/search', '/about', '/contact', '/dashboard', '/dashboard/*', 
     '/profile', '/messages', '/messages/*', '/saved', '/reviews',
-    '/login', '/register', '/auth/*'
+    '/login', '/register', '/auth/*', '/admin', '/admin/*'
   ],
   'landing': [
     '/', '/about', '/contact'
