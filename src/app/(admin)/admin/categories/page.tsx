@@ -21,10 +21,14 @@ export default function AdminCategoriesPage() {
   const [loading, setLoading] = useState(true)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
 
+  // Add these new states for bulk operations
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   // Add this state for bulk import
-const [bulkCategories, setBulkCategories] = useState('')
-const [importFormat, setImportFormat] = useState<'csv' | 'json'>('csv')
-const [importResult, setImportResult] = useState<{success?: string; error?: string} | null>(null)
+  const [bulkCategories, setBulkCategories] = useState('')
+  const [importFormat, setImportFormat] = useState<'csv' | 'json'>('csv')
+  const [importResult, setImportResult] = useState<{success?: string; error?: string} | null>(null)
   const [newCategory, setNewCategory] = useState({
     name: '',
     description: '',
@@ -33,6 +37,7 @@ const [importResult, setImportResult] = useState<{success?: string; error?: stri
   })
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
+  
   // Add null check
   if (!supabase) {
     setError('Unable to connect to database')
@@ -45,7 +50,6 @@ const [importResult, setImportResult] = useState<{success?: string; error?: stri
   }, [])
   
   const fetchCategories = async () => {
-   
     try {
       setLoading(true)
       
@@ -57,11 +61,64 @@ const [importResult, setImportResult] = useState<{success?: string; error?: stri
       if (error) throw error
       
       setCategories(data || [])
+      setSelectedCategories([]) // Clear selections when refetching
     } catch (err: any) {
       console.error('Error loading categories:', err)
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Bulk selection functions
+  const handleSelectCategory = (categoryId: string, isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedCategories(prev => [...prev, categoryId])
+    } else {
+      setSelectedCategories(prev => prev.filter(id => id !== categoryId))
+    }
+  }
+
+  const handleSelectAll = (isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedCategories(categories.map(cat => cat.id))
+    } else {
+      setSelectedCategories([])
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedCategories.length === 0) return
+
+    const selectedNames = categories
+      .filter(cat => selectedCategories.includes(cat.id))
+      .map(cat => cat.name)
+      .join(', ')
+
+    if (!window.confirm(
+      `Are you sure you want to delete ${selectedCategories.length} categories?\n\n` +
+      `Categories to delete: ${selectedNames}\n\n` +
+      `This action cannot be undone.`
+    )) return
+
+    try {
+      setBulkDeleting(true)
+      setError(null)
+
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .in('id', selectedCategories)
+
+      if (error) throw error
+
+      setSelectedCategories([])
+      fetchCategories()
+    } catch (err: any) {
+      console.error('Error bulk deleting categories:', err)
+      setError(`Failed to delete categories: ${err.message}`)
+    } finally {
+      setBulkDeleting(false)
     }
   }
   
@@ -180,7 +237,7 @@ const [importResult, setImportResult] = useState<{success?: string; error?: stri
   }
 
   // Add this function to handle bulk import
-const handleBulkImport = async () => {
+  const handleBulkImport = async () => {
     try {
       setError(null)
       setImportResult(null)
@@ -329,14 +386,14 @@ const handleBulkImport = async () => {
   const generateSampleData = () => {
     if (importFormat === 'csv') {
       setBulkCategories(`Restaurants,Places to eat and dine
-  Shopping,Retail shops and stores
-  Services,Professional and personal services
-  Health & Medical,Healthcare providers and facilities
-  Beauty & Spa,Salons and beauty services
-  Home Services,Home repair and maintenance
-  Automotive,Car dealerships and repair shops
-  Education,Schools and educational services
-  Entertainment,Entertainment venues and activities`)
+Shopping,Retail shops and stores
+Services,Professional and personal services
+Health & Medical,Healthcare providers and facilities
+Beauty & Spa,Salons and beauty services
+Home Services,Home repair and maintenance
+Automotive,Car dealerships and repair shops
+Education,Schools and educational services
+Entertainment,Entertainment venues and activities`)
     } else {
       setBulkCategories(JSON.stringify([
         { name: "Restaurants", description: "Places to eat and dine", featured: true },
@@ -346,6 +403,10 @@ const handleBulkImport = async () => {
       ], null, 2))
     }
   }
+
+  // Calculate if all visible categories are selected
+  const allSelected = categories.length > 0 && selectedCategories.length === categories.length
+  const someSelected = selectedCategories.length > 0 && selectedCategories.length < categories.length
   
   return (
     <div>
@@ -407,8 +468,46 @@ const handleBulkImport = async () => {
     </Tab.List>
     
     <Tab.Panels>
-      {/* Categories List Panel */}
+      {/* Categories List Panel with Bulk Select/Delete */}
       <Tab.Panel>
+        {/* Bulk Actions Bar */}
+        {selectedCategories.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedCategories.length} categor{selectedCategories.length === 1 ? 'y' : 'ies'} selected
+                </span>
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setSelectedCategories([])}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Clear selection
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                >
+                  {bulkDeleting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    `Delete ${selectedCategories.length}`
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {categories.length === 0 ? (
           <p className="text-gray-500">No categories found.</p>
         ) : (
@@ -416,6 +515,17 @@ const handleBulkImport = async () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th scope="col" className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded"
+                      checked={allSelected}
+                      ref={input => {
+                        if (input) input.indeterminate = someSelected
+                      }}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                    />
+                  </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Name
                   </th>
@@ -432,7 +542,18 @@ const handleBulkImport = async () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {categories.map(category => (
-                  <tr key={category.id}>
+                  <tr 
+                    key={category.id}
+                    className={selectedCategories.includes(category.id) ? 'bg-blue-50' : ''}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded"
+                        checked={selectedCategories.includes(category.id)}
+                        onChange={(e) => handleSelectCategory(category.id, e.target.checked)}
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-medium text-gray-900">{category.name}</div>
                       {category.parent_id && (
