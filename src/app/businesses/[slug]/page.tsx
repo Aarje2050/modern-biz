@@ -304,9 +304,10 @@ const businessData = {
 
 // Get template-generated title and description
 const seoData = businessMetadata(businessData, {
-  title: business.name +' | ' +'Reviews & Contact Info',
-  description: "Custom description for this special case"
+  title: `${business.name} | Reviews & Contact Info`,
+  description: `${business.name} offers trusted ${category?.toLowerCase()} services. Listed on DuctCleaningCA – Canada’s duct cleaning directory.`
 })
+
 
 // ✅ FIXED (Handle null values)
 return {
