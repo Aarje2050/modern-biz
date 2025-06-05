@@ -21,11 +21,15 @@ const nextConfig = {
       },
     ]
   },
+  // Allow external images from WordPress (UPDATED for temp domain)
   images: {
-    domains: [
-      'krmmxfmvssmzcmbitvil.supabase.co', 
-      'ductcleaningca.com',
-      'www.ductcleaningca.com'  // Add this line
+    domains: ['krmmxfmvssmzcmbitvil.supabase.co'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'uatbou.serveravatartmp.com',
+        pathname: '/wp-content/uploads/**',
+      },
     ],
   },
 
