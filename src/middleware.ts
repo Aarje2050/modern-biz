@@ -1,4 +1,4 @@
-// src/middleware.ts - COMPLETE FIXED VERSION
+// src/middleware.ts - COMPLETE FIXED VERSION WITH DEV FALLBACK
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -191,10 +191,42 @@ export async function middleware(request: NextRequest) {
       }
       
     } else {
-      // TEMPORARY: No site found - log and allow (don't redirect)
-      console.log(`🛡️ [MIDDLEWARE-NOTFOUND] No site found for domain: ${searchDomain}`)
-      response.headers.set('x-site-domain', hostname)
-      // Don't redirect - just continue
+      // No site found - check for development fallback
+      if (isDev && LOCALHOST_DOMAINS.includes(hostname)) {
+        console.log(`🛡️ [MIDDLEWARE-DEV-FALLBACK] Trying ductcleaningca.com for localhost`)
+        
+        try {
+          const prodSiteConfig = await getSiteByDomain('ductcleaningca.com')
+          
+          if (prodSiteConfig) {
+            console.log(`🛡️ [MIDDLEWARE-DEV-FOUND] Using production site for development`)
+            response.headers.set('x-site-id', prodSiteConfig.id)
+            response.headers.set('x-site-config', JSON.stringify(prodSiteConfig))
+            response.headers.set('x-site-domain', 'localhost:3000') // Keep localhost for dev
+            
+            // Apply same route validation for dev fallback
+            const siteType = (prodSiteConfig as any).site_type || 'directory'
+            const routeAllowed = isRouteAllowedForSiteType(pathname, siteType)
+            
+            console.log(`🛡️ [MIDDLEWARE-DEV-ROUTE] Path: ${pathname}, SiteType: ${siteType}, Allowed: ${routeAllowed}`)
+            
+            if (!routeAllowed) {
+              console.log(`🛡️ [MIDDLEWARE-DEV-REDIRECT] Route ${pathname} not allowed for site type ${siteType}`)
+              return NextResponse.redirect(new URL('/', request.url))
+            }
+          } else {
+            console.log(`🛡️ [MIDDLEWARE-DEV-NOTFOUND] Production site not found either`)
+            response.headers.set('x-site-domain', hostname)
+          }
+        } catch (devError) {
+          console.log(`🛡️ [MIDDLEWARE-DEV-ERROR] Development fallback error:`, devError)
+          response.headers.set('x-site-domain', hostname)
+        }
+      } else {
+        // Production - no site found
+        console.log(`🛡️ [MIDDLEWARE-NOTFOUND] No site found for domain: ${searchDomain}`)
+        response.headers.set('x-site-domain', hostname)
+      }
     }
   } catch (error) {
     // Database error - fallback
