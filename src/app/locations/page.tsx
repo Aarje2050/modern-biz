@@ -1,4 +1,4 @@
-// src/app/locations/page.tsx (SEO-Optimized Location Listings)
+// src/app/locations/page.tsx (FIXED - Proper Location Data Fetching)
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentSite } from '@/lib/site-context'
 import Link from 'next/link'
@@ -16,10 +16,45 @@ interface Location {
 // SEO-friendly pagination
 const PAGE_SIZE = 20
 
-// Helper function to generate location slug
+// Helper function to generate location slug with robust Canadian province support
 function generateLocationSlug(city: string, state: string): string {
-  const cleanCity = city.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  const cleanState = state.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  const cleanCity = city.toLowerCase()
+    .replace(/\bno\.\s*(\d+)/g, 'no-$1') // "No. 128" -> "no-128"
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  
+  // Map full state names to URL-friendly versions (comprehensive)
+  const stateMapping: Record<string, string> = {
+    // Canadian provinces and territories
+    'ontario': 'ontario',
+    'quebec': 'quebec',
+    'british columbia': 'british-columbia',
+    'alberta': 'alberta', 
+    'manitoba': 'manitoba',
+    'saskatchewan': 'saskatchewan',
+    'nova scotia': 'nova-scotia',
+    'new brunswick': 'new-brunswick',
+    'newfoundland and labrador': 'newfoundland-and-labrador',
+    'prince edward island': 'prince-edward-island',
+    'yukon': 'yukon',
+    'northwest territories': 'northwest-territories',
+    'nunavut': 'nunavut',
+    // US states
+    'california': 'california',
+    'new york': 'new-york',
+    'texas': 'texas',
+    'florida': 'florida',
+    'illinois': 'illinois',
+    'pennsylvania': 'pennsylvania',
+    'ohio': 'ohio',
+    'georgia': 'georgia',
+    'michigan': 'michigan',
+    'north carolina': 'north-carolina'
+  }
+  
+  const cleanState = stateMapping[state.toLowerCase()] || 
+                     state.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  
   return `${cleanCity}-${cleanState}`
 }
 
@@ -85,17 +120,31 @@ export default async function LocationsPage({
   const to = from + PAGE_SIZE - 1
   
   try {
-    // **STEP 1: Get all businesses for this site**
-    const { data: siteBusinesses } = await supabase
+    // **CORRECTED APPROACH: Join businesses with locations to get site-aware data**
+    const { data: businessLocations, error } = await supabase
       .from('businesses')
-      .select('id')
+      .select(`
+        id,
+        site_id,
+        locations!inner(
+          city,
+          state,
+          is_active
+        )
+      `)
       .eq('site_id', siteConfig.id)
       .eq('status', 'active')
+      .eq('locations.is_active', true)
+      .not('locations.city', 'is', null)
+      .not('locations.state', 'is', null)
     
-    const siteBusinessIds = (siteBusinesses || []).map(b => b.id)
+    if (error) {
+      console.error('Database error:', error)
+      throw error
+    }
     
-    if (siteBusinessIds.length === 0) {
-      // No businesses, show empty state
+    if (!businessLocations || businessLocations.length === 0) {
+      // No businesses with locations, show empty state
       return (
         <div className="min-h-screen bg-gray-50">
           <section className="bg-gradient-to-r from-red-600 to-red-700 text-white py-12">
@@ -120,7 +169,7 @@ export default async function LocationsPage({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 </svg>
                 <h3 className="text-xl font-medium text-gray-900 mb-2">No locations available</h3>
-                <p className="text-gray-500 mb-6">Be the first to add a business to create locations.</p>
+                <p className="text-gray-500 mb-6">Be the first to add a business with location information.</p>
                 <Link 
                   href="/businesses/add" 
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700"
@@ -134,58 +183,37 @@ export default async function LocationsPage({
       )
     }
     
-    // **STEP 2: Get unique locations for site businesses**
-    const { data: rawLocations } = await supabase
-      .from('locations')
-      .select('city, state')
-      .in('business_id', siteBusinessIds)
-      .not('city', 'is', null)
-      .not('state', 'is', null)
+    // **STEP 2: Process unique locations and count businesses**
+    const locationMap = new Map<string, { city: string; state: string; count: number; businessIds: Set<string> }>()
     
-    if (!rawLocations || rawLocations.length === 0) {
-      return (
-        <div className="min-h-screen bg-gray-50">
-          <section className="bg-gradient-to-r from-red-600 to-red-700 text-white py-12">
-            <div className="container mx-auto px-4">
-              <div className="max-w-4xl mx-auto text-center">
-                <h1 className="text-4xl font-bold mb-4">
-                  Browse {niche.charAt(0).toUpperCase() + niche.slice(1)} Services by Location
-                </h1>
-              </div>
-            </div>
-          </section>
-          
-          <section className="py-12">
-            <div className="container mx-auto px-4">
-              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                <h3 className="text-xl font-medium text-gray-900 mb-2">No location data available</h3>
-                <p className="text-gray-500 mb-6">Businesses haven't added location information yet.</p>
-              </div>
-            </div>
-          </section>
-        </div>
-      )
-    }
-    
-    // **STEP 3: Process unique locations**
-    const locationMap = new Map<string, { city: string; state: string; count: number }>()
-    
-    rawLocations.forEach(loc => {
-      const key = `${loc.city.toLowerCase()}-${loc.state.toLowerCase()}`
-      const existing = locationMap.get(key)
+    businessLocations.forEach(business => {
+      // Handle the case where locations might be an array or single object
+      const locations = Array.isArray(business.locations) ? business.locations : [business.locations]
       
-      if (existing) {
-        existing.count += 1
-      } else {
-        locationMap.set(key, {
-          city: loc.city,
-          state: loc.state,
-          count: 1
-        })
-      }
+      locations.forEach(location => {
+        if (location && location.city && location.state) {
+          const key = `${location.city.toLowerCase()}-${location.state.toLowerCase()}`
+          const existing = locationMap.get(key)
+          
+          if (existing) {
+            // Only count unique businesses (in case business has multiple locations in same city)
+            if (!existing.businessIds.has(business.id)) {
+              existing.count += 1
+              existing.businessIds.add(business.id)
+            }
+          } else {
+            locationMap.set(key, {
+              city: location.city,
+              state: location.state,
+              count: 1,
+              businessIds: new Set([business.id])
+            })
+          }
+        }
+      })
     })
     
-    // Convert to array and sort
+    // **STEP 3: Convert to array and sort**
     let allLocations: Location[] = Array.from(locationMap.entries()).map(([key, data]) => ({
       city: data.city,
       state: data.state,
@@ -307,7 +335,7 @@ export default async function LocationsPage({
                           {location.city}
                         </h2>
                         <p className="text-sm text-gray-500 mb-3">
-                          {location.state.toUpperCase()}
+                          {location.state}
                         </p>
                         
                         {/* Business Count */}

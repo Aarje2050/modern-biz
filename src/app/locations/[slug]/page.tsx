@@ -1,4 +1,4 @@
-// src/app/locations/[slug]/page.tsx - Single Location Page
+// src/app/locations/[slug]/page.tsx - ENTERPRISE SOLUTION: Database-driven slug resolution
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentSite } from '@/lib/site-context'
 import { locationMetadata } from '@/lib/seo/helpers'
@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import BusinessCard from '@/components/businesses/business-card'
 import Pagination from '@/components/ui/pagination'
+import LocationFilters from '@/components/locations/LocationFilters'
 import type { Metadata } from 'next'
 
 // Number of results per page
@@ -21,31 +22,151 @@ interface BusinessWithLocation {
   state?: string
 }
 
-interface LocationData {
+interface LocationMatch {
   city: string
   state: string
   slug: string
-  businessCount: number
 }
 
-// Helper function to parse location slug
-function parseLocationSlug(slug: string): { city: string; state: string } | null {
-  // Handle formats like "toronto-on", "new-york-ny", "los-angeles-ca"
-  const parts = slug.split('-')
-  if (parts.length < 2) return null
-  
-  // Last part is state, everything else is city
-  const state = parts[parts.length - 1]
-  const city = parts.slice(0, -1).join(' ')
-  
-  return { city, state }
-}
-
-// Helper function to generate location slug (reverse of parse)
+// ENTERPRISE: Simple, reliable slug generation (same as locations listing page)
 function generateLocationSlug(city: string, state: string): string {
-  const cleanCity = city.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  const cleanState = state.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  const cleanCity = city.toLowerCase()
+    .replace(/\bno\.\s*(\d+)/g, 'no-$1') // "No. 128" -> "no-128"
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  
+  // Map full state names to URL-friendly versions (comprehensive)
+  const stateMapping: Record<string, string> = {
+    // Canadian provinces and territories
+    'ontario': 'ontario',
+    'quebec': 'quebec',
+    'british columbia': 'british-columbia',
+    'alberta': 'alberta', 
+    'manitoba': 'manitoba',
+    'saskatchewan': 'saskatchewan',
+    'nova scotia': 'nova-scotia',
+    'new brunswick': 'new-brunswick',
+    'newfoundland and labrador': 'newfoundland-and-labrador',
+    'prince edward island': 'prince-edward-island',
+    'yukon': 'yukon',
+    'northwest territories': 'northwest-territories',
+    'nunavut': 'nunavut',
+    // US states
+    'california': 'california',
+    'new york': 'new-york',
+    'texas': 'texas',
+    'florida': 'florida',
+    'illinois': 'illinois',
+    'pennsylvania': 'pennsylvania',
+    'ohio': 'ohio',
+    'georgia': 'georgia',
+    'michigan': 'michigan',
+    'north carolina': 'north-carolina'
+  }
+  
+  const cleanState = stateMapping[state.toLowerCase()] || 
+                     state.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  
   return `${cleanCity}-${cleanState}`
+}
+
+// ENTERPRISE: Find location by matching generated slug with database data
+async function findLocationBySlug(slug: string, siteId: string): Promise<LocationMatch | null> {
+  const supabase = createClient()
+  
+  try {
+    // Get ALL unique locations for this site
+    const { data: businessLocations } = await supabase
+      .from('businesses')
+      .select(`
+        id,
+        locations!inner(city, state, is_active)
+      `)
+      .eq('site_id', siteId)
+      .eq('status', 'active')
+      .eq('locations.is_active', true)
+      .not('locations.city', 'is', null)
+      .not('locations.state', 'is', null)
+    
+    if (!businessLocations) return null
+    
+    // Create unique location set
+    const uniqueLocations = new Map<string, LocationMatch>()
+    
+    businessLocations.forEach(business => {
+      const locations = Array.isArray(business.locations) ? business.locations : [business.locations]
+      
+      locations.forEach(location => {
+        if (location?.city && location?.state) {
+          const locationKey = `${location.city.toLowerCase()}-${location.state.toLowerCase()}`
+          
+          if (!uniqueLocations.has(locationKey)) {
+            const generatedSlug = generateLocationSlug(location.city, location.state)
+            
+            uniqueLocations.set(locationKey, {
+              city: location.city,
+              state: location.state,
+              slug: generatedSlug
+            })
+          }
+        }
+      })
+    })
+    
+    // Find the location that matches our slug
+    for (const location of uniqueLocations.values()) {
+      if (location.slug === slug) {
+        return location
+      }
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Location lookup error:', error)
+    return null
+  }
+}
+
+// Helper function to generate SEO-optimized location content
+function generateLocationContent(city: string, state: string, niche: string, businessCount: number) {
+  const serviceTypes = {
+    'duct-cleaning': {
+      services: ['air duct cleaning', 'dryer vent cleaning', 'HVAC maintenance', 'indoor air quality testing'],
+      benefits: ['improved air quality', 'energy efficiency', 'reduced allergens', 'better HVAC performance'],
+      urgency: 'regular cleaning every 3-5 years'
+    },
+    'pet-stores': {
+      services: ['pet supplies', 'grooming services', 'veterinary care', 'pet training'],
+      benefits: ['healthy pets', 'expert care', 'quality products', 'professional guidance'],
+      urgency: 'ongoing pet care needs'
+    },
+    'business': {
+      services: ['professional services', 'consultation', 'maintenance', 'support'],
+      benefits: ['reliable service', 'expert knowledge', 'quality results', 'customer satisfaction'],
+      urgency: 'when you need professional help'
+    }
+  }
+  
+  const info = serviceTypes[niche as keyof typeof serviceTypes] || serviceTypes.business
+  const locationKey = `${city}-${state}`.toLowerCase()
+  
+  // Generate varied content based on location characteristics
+  const contentVariations = [
+    `${city}, ${state} residents trust our directory to find reliable ${niche} professionals. With ${businessCount} verified local businesses, you'll discover ${info.services.join(', ')} services that prioritize ${info.benefits.join(' and ')}. Our listed professionals understand the unique needs of ${city} customers and provide ${info.urgency}.`,
+    
+    `Finding quality ${niche} services in ${city} has never been easier. Our comprehensive directory features ${businessCount} local businesses specializing in ${info.services.join(', ')}. Each listed company serves the ${city}, ${state} area with a commitment to ${info.benefits.join(', ')}, ensuring you receive professional service when you need it most.`,
+    
+    `${city}'s ${niche} industry offers exceptional service standards, and our directory connects you with the best local providers. Browse ${businessCount} verified businesses offering ${info.services.join(', ')} with transparent pricing and customer reviews. These ${city} professionals deliver ${info.benefits.join(', ')} to ensure complete customer satisfaction.`
+  ]
+  
+  // Use a simple hash of the location to consistently pick the same variation
+  const hash = locationKey.split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0)
+    return a & a
+  }, 0)
+  
+  const variationIndex = Math.abs(hash) % contentVariations.length
+  return contentVariations[variationIndex]
 }
 
 export async function generateMetadata({ 
@@ -54,7 +175,6 @@ export async function generateMetadata({
   params: { slug: string } 
 }): Promise<Metadata> {
   const siteConfig = getCurrentSite()
-  const supabase = createClient()
   
   if (!siteConfig) {
     return {
@@ -63,50 +183,37 @@ export async function generateMetadata({
     }
   }
   
-  // Parse location from slug
-  const parsed = parseLocationSlug(params.slug)
-  if (!parsed) {
+  // ENTERPRISE: Use database to resolve slug
+  const locationMatch = await findLocationBySlug(params.slug, siteConfig.id)
+  
+  if (!locationMatch) {
     return {
-      title: 'Invalid Location',
-      description: 'The location format is invalid.'
+      title: 'Location Not Found',
+      description: 'The location you are looking for could not be found.'
     }
   }
   
   try {
-    // Get businesses in this location for this site
-    const { data: siteBusinesses } = await supabase
+    // Get business count for this location
+    const supabase = createClient()
+    
+    const { data: businessesInLocation } = await supabase
       .from('businesses')
-      .select('id')
+      .select(`
+        id,
+        locations!inner(city, state, is_active)
+      `)
       .eq('site_id', siteConfig.id)
       .eq('status', 'active')
+      .eq('locations.is_active', true)
+      .ilike('locations.city', locationMatch.city)
+      .ilike('locations.state', locationMatch.state)
     
-    if (!siteBusinesses || siteBusinesses.length === 0) {
-      return locationMetadata({
-        city: parsed.city,
-        state: parsed.state,
-        slug: params.slug,
-        businessCount: 0
-      }, {
-        niche: siteConfig.config?.niche || 'business',
-        siteName: siteConfig.name
-      })
-    }
-    
-    const siteBusinessIds = siteBusinesses.map(b => b.id)
-    
-    // Get count of businesses in this location
-    const { data: locationBusinesses } = await supabase
-      .from('locations')
-      .select('business_id')
-      .in('business_id', siteBusinessIds)
-      .ilike('city', parsed.city)
-      .ilike('state', parsed.state)
-    
-    const businessCount = locationBusinesses?.length || 0
+    const businessCount = businessesInLocation?.length || 0
     
     return locationMetadata({
-      city: parsed.city,
-      state: parsed.state,
+      city: locationMatch.city,
+      state: locationMatch.state,
       slug: params.slug,
       businessCount
     }, {
@@ -116,8 +223,8 @@ export async function generateMetadata({
   } catch (error) {
     console.error('Location metadata generation error:', error)
     return {
-      title: `${parsed.city}, ${parsed.state.toUpperCase()} - ${siteConfig.name}`,
-      description: `Find services in ${parsed.city}, ${parsed.state.toUpperCase()}`
+      title: `${locationMatch.city}, ${locationMatch.state} - ${siteConfig.name}`,
+      description: `Find services in ${locationMatch.city}, ${locationMatch.state}`
     }
   }
 }
@@ -148,50 +255,54 @@ export default async function LocationPage({
     )
   }
   
-  // Parse location from slug
-  const parsed = parseLocationSlug(params.slug)
-  if (!parsed) {
+  // ENTERPRISE: Use database to resolve slug
+  const locationMatch = await findLocationBySlug(params.slug, siteConfig.id)
+  
+  if (!locationMatch) {
     notFound()
   }
   
   const niche = siteConfig.config?.niche || 'business'
   
   try {
-    // **STEP 1: Get all active businesses for this site**
-    const { data: siteBusinesses } = await supabase
+    // **STEP 1: Get businesses in this location for this site**
+    const { data: businessesInLocation, error: locationError } = await supabase
       .from('businesses')
-      .select('id')
+      .select(`
+        id,
+        name,
+        slug,
+        short_description,
+        logo_url,
+        created_at,
+        locations!inner(city, state, is_active)
+      `)
       .eq('site_id', siteConfig.id)
       .eq('status', 'active')
+      .eq('locations.is_active', true)
+      .ilike('locations.city', locationMatch.city)
+      .ilike('locations.state', locationMatch.state)
     
-    if (!siteBusinesses || siteBusinesses.length === 0) {
+    if (locationError) {
+      console.error('Location query error:', locationError)
+      throw locationError
+    }
+    
+    if (!businessesInLocation || businessesInLocation.length === 0) {
       notFound()
     }
     
-    const siteBusinessIds = siteBusinesses.map(b => b.id)
+    // Extract business IDs for category filtering
+    const businessIdsInLocation = businessesInLocation.map(b => b.id)
     
-    // **STEP 2: Get businesses in this location**
-    const { data: locationBusinessIds } = await supabase
-      .from('locations')
-      .select('business_id')
-      .in('business_id', siteBusinessIds)
-      .ilike('city', parsed.city)
-      .ilike('state', parsed.state)
-    
-    if (!locationBusinessIds || locationBusinessIds.length === 0) {
-      notFound()
-    }
-    
-    const businessIdsInLocation = locationBusinessIds.map(l => l.business_id)
-    
-    // **STEP 3: Get categories for filtering (only for this site)**
+    // **STEP 2: Get categories for filtering (only for this site)**
     const { data: categories } = await supabase
       .from('categories')
       .select('id, name, slug')
       .eq('site_id', siteConfig.id)
       .order('name')
     
-    // **STEP 4: Apply category filter if selected**
+    // **STEP 3: Apply category filter if selected**
     let filteredBusinessIds = businessIdsInLocation
     
     if (categoryFilter && categories) {
@@ -208,61 +319,50 @@ export default async function LocationPage({
       }
     }
     
-    if (filteredBusinessIds.length === 0) {
-      // Show empty state but don't 404 - this is valid (no businesses in category + location combo)
-    }
-    
-    // **STEP 5: Get business details with pagination**
-    const from = (currentPage - 1) * PAGE_SIZE
-    const to = from + PAGE_SIZE - 1
-    
-    let businessQuery = supabase
-      .from('businesses')
-      .select('id, name, slug, short_description, logo_url', { count: 'exact' })
-      .in('id', filteredBusinessIds)
-    
-    // Apply sorting
-    switch (sortOption) {
-      case 'name_desc':
-        businessQuery = businessQuery.order('name', { ascending: false })
-        break
-      case 'newest':
-        businessQuery = businessQuery.order('created_at', { ascending: false })
-        break
-      case 'oldest':
-        businessQuery = businessQuery.order('created_at', { ascending: true })
-        break
-      default: // name_asc
-        businessQuery = businessQuery.order('name', { ascending: true })
-        break
-    }
-    
-    businessQuery = businessQuery.range(from, to)
-    
-    const { data: businesses, count: totalBusinesses } = await businessQuery
-    
-    // **STEP 6: Enhance businesses with location data**
-    const enhancedBusinesses: BusinessWithLocation[] = await Promise.all(
-      (businesses || []).map(async (business) => {
-        // Get primary location for each business
-        const { data: location } = await supabase
-          .from('locations')
-          .select('city, state')
-          .eq('business_id', business.id)
-          .eq('is_primary', true)
-          .limit(1)
-          .maybeSingle()
-        
-        return {
-          ...business,
-          city: location?.city || parsed.city,
-          state: location?.state || parsed.state
-        }
-      })
+    // **STEP 4: Filter businesses based on category selection**
+    let filteredBusinesses = businessesInLocation.filter(b => 
+      filteredBusinessIds.includes(b.id)
     )
     
+    // **STEP 5: Apply sorting**
+    switch (sortOption) {
+      case 'name_desc':
+        filteredBusinesses.sort((a, b) => b.name.localeCompare(a.name))
+        break
+      case 'newest':
+        filteredBusinesses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        break
+      case 'oldest':
+        filteredBusinesses.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        break
+      default: // name_asc
+        filteredBusinesses.sort((a, b) => a.name.localeCompare(b.name))
+        break
+    }
+    
+    // **STEP 6: Apply pagination**
+    const totalBusinesses = filteredBusinesses.length
+    const from = (currentPage - 1) * PAGE_SIZE
+    const paginatedBusinesses = filteredBusinesses.slice(from, from + PAGE_SIZE)
+    
+    // **STEP 7: Transform to expected format**
+    const enhancedBusinesses: BusinessWithLocation[] = paginatedBusinesses.map(business => {
+      // Extract location data (locations is an array due to inner join)
+      const locationData = Array.isArray(business.locations) ? business.locations[0] : business.locations
+      
+      return {
+        id: business.id,
+        name: business.name,
+        slug: business.slug,
+        short_description: business.short_description,
+        logo_url: business.logo_url,
+        city: locationData?.city || locationMatch.city,
+        state: locationData?.state || locationMatch.state
+      }
+    })
+    
     // Calculate total pages
-    const totalPages = Math.ceil((totalBusinesses || 0) / PAGE_SIZE)
+    const totalPages = Math.ceil(totalBusinesses / PAGE_SIZE)
     
     // Find selected category data
     const selectedCategoryData = categories?.find(c => c.slug === categoryFilter)
@@ -280,13 +380,13 @@ export default async function LocationPage({
                 <Link href="/locations" className="hover:text-white">Locations</Link>
                 <span>›</span>
                 <span className="text-white font-medium">
-                  {parsed.city}, {parsed.state.toUpperCase()}
+                  {locationMatch.city}, {locationMatch.state}
                 </span>
               </nav>
               
               <div className="text-center">
                 <h1 className="text-4xl font-bold mb-4">
-                  {niche.charAt(0).toUpperCase() + niche.slice(1)} Services in {parsed.city}, {parsed.state.toUpperCase()}
+                  {niche.charAt(0).toUpperCase() + niche.slice(1)} Services in {locationMatch.city}, {locationMatch.state}
                   {selectedCategoryData && (
                     <span className="block text-2xl font-normal mt-2 text-red-100">
                       {selectedCategoryData.name}
@@ -295,48 +395,17 @@ export default async function LocationPage({
                 </h1>
                 <p className="text-xl text-red-100 mb-6">
                   {selectedCategoryData 
-                    ? `Find trusted ${selectedCategoryData.name.toLowerCase()} services in ${parsed.city}`
-                    : `Discover verified ${niche} professionals in ${parsed.city}`}
+                    ? `Find trusted ${selectedCategoryData.name.toLowerCase()} services in ${locationMatch.city}`
+                    : `Discover verified ${niche} professionals in ${locationMatch.city}`}
                 </p>
                 
                 {/* Filters */}
-                <div className="max-w-2xl mx-auto flex flex-col sm:flex-row gap-4">
-                  <form method="GET" className="flex-1 flex gap-4">
-                    {/* Category Filter */}
-                    <select 
-                      name="category"
-                      defaultValue={categoryFilter || ''}
-                      className="flex-1 px-4 py-3 text-gray-900 focus:outline-none rounded-lg"
-                      onChange={(e) => {
-                        const form = e.target.form as HTMLFormElement
-                        form.submit()
-                      }}
-                    >
-                      <option value="">All Categories</option>
-                      {categories?.map(category => (
-                        <option key={category.id} value={category.slug}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                    
-                    {/* Sort Filter */}
-                    <select 
-                      name="sort"
-                      defaultValue={sortOption}
-                      className="px-4 py-3 text-gray-900 focus:outline-none rounded-lg"
-                      onChange={(e) => {
-                        const form = e.target.form as HTMLFormElement
-                        form.submit()
-                      }}
-                    >
-                      <option value="name_asc">Name A-Z</option>
-                      <option value="name_desc">Name Z-A</option>
-                      <option value="newest">Newest First</option>
-                      <option value="oldest">Oldest First</option>
-                    </select>
-                  </form>
-                </div>
+                <LocationFilters
+                  categories={categories || []}
+                  currentCategory={categoryFilter}
+                  currentSort={sortOption}
+                  locationSlug={params.slug}
+                />
               </div>
             </div>
           </div>
@@ -351,7 +420,7 @@ export default async function LocationPage({
                 <div>
                   <p className="text-gray-600">
                     {totalBusinesses} {totalBusinesses === 1 ? 'service' : 'services'} found 
-                    in {parsed.city}, {parsed.state.toUpperCase()}
+                    in {locationMatch.city}, {locationMatch.state}
                     {selectedCategoryData && ` for ${selectedCategoryData.name}`}
                     {totalPages > 1 && ` (Page ${currentPage} of ${totalPages})`}
                   </p>
@@ -405,13 +474,13 @@ export default async function LocationPage({
                 </svg>
                 <h3 className="text-xl font-medium text-gray-900 mb-2">
                   {selectedCategoryData 
-                    ? `No ${selectedCategoryData.name.toLowerCase()} services in ${parsed.city}`
-                    : `No services found in ${parsed.city}`}
+                    ? `No ${selectedCategoryData.name.toLowerCase()} services in ${locationMatch.city}`
+                    : `No services found in ${locationMatch.city}`}
                 </h3>
                 <p className="text-gray-500 mb-6">
                   {selectedCategoryData 
                     ? `Try browsing all categories or check nearby locations.`
-                    : `Be the first to list your ${niche} business in ${parsed.city}.`}
+                    : `Be the first to list your ${niche} business in ${locationMatch.city}.`}
                 </p>
                 <div className="space-x-4">
                   {selectedCategoryData && (
@@ -439,7 +508,7 @@ export default async function LocationPage({
           <section className="py-12 bg-white border-t">
             <div className="container mx-auto px-4">
               <h2 className="text-2xl font-bold text-center mb-8">
-                Browse {niche.charAt(0).toUpperCase() + niche.slice(1)} Categories in {parsed.city}
+                Browse {niche.charAt(0).toUpperCase() + niche.slice(1)} Categories in {locationMatch.city}
               </h2>
               <div className="flex flex-wrap justify-center gap-3">
                 {categories.slice(0, 10).map((category) => (
@@ -452,7 +521,7 @@ export default async function LocationPage({
                         : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                     }`}
                   >
-                    {category.name} in {parsed.city}
+                    {category.name} in {locationMatch.city}
                   </Link>
                 ))}
                 {categories.length > 10 && (
@@ -473,14 +542,10 @@ export default async function LocationPage({
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto text-center">
               <h2 className="text-2xl font-bold mb-4">
-                About {niche.charAt(0).toUpperCase() + niche.slice(1)} Services in {parsed.city}
+                About {niche.charAt(0).toUpperCase() + niche.slice(1)} Services in {locationMatch.city}
               </h2>
-              <p className="text-gray-600 leading-relaxed">
-                {parsed.city} offers a variety of {niche} services to meet your needs. 
-                Our directory features verified local businesses that provide quality services 
-                with transparent pricing and customer reviews. Whether you're looking for 
-                emergency services or scheduled appointments, you'll find trusted professionals 
-                in {parsed.city}, {parsed.state.toUpperCase()}.
+              <p className="text-gray-600 leading-relaxed mb-8">
+                {generateLocationContent(locationMatch.city, locationMatch.state, niche, totalBusinesses)}
               </p>
               
               <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -491,7 +556,7 @@ export default async function LocationPage({
                     </svg>
                   </div>
                   <h3 className="font-semibold mb-2">Verified Businesses</h3>
-                  <p className="text-sm text-gray-600">All listed businesses are verified for quality and reliability</p>
+                  <p className="text-sm text-gray-600">All {locationMatch.city} businesses are verified for quality and reliability</p>
                 </div>
                 
                 <div className="text-center">
@@ -500,8 +565,8 @@ export default async function LocationPage({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     </svg>
                   </div>
-                  <h3 className="font-semibold mb-2">Local Service</h3>
-                  <p className="text-sm text-gray-600">Connect with {niche} professionals in your area</p>
+                  <h3 className="font-semibold mb-2">Local {locationMatch.city} Service</h3>
+                  <p className="text-sm text-gray-600">Connect with trusted {niche} professionals in the {locationMatch.city} area</p>
                 </div>
                 
                 <div className="text-center">
@@ -511,7 +576,7 @@ export default async function LocationPage({
                     </svg>
                   </div>
                   <h3 className="font-semibold mb-2">Quick Response</h3>
-                  <p className="text-sm text-gray-600">Get fast quotes and service scheduling</p>
+                  <p className="text-sm text-gray-600">Fast quotes and service scheduling throughout {locationMatch.city}, {locationMatch.state}</p>
                 </div>
               </div>
             </div>

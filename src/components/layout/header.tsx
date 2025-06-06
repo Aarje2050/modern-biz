@@ -106,6 +106,16 @@ export default function Header() {
                 Categories
               </Link>
               <Link 
+                href="/locations" 
+                className={`font-medium transition-colors ${
+                  pathname.startsWith('/locations') 
+                    ? 'text-red-600' 
+                    : 'text-gray-700 hover:text-red-600'
+                }`}
+              >
+                Locations
+              </Link>
+              <Link 
                 href="/search" 
                 className={`font-medium transition-colors ${
                   pathname.startsWith('/search') 
