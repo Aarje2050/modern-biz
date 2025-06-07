@@ -9,7 +9,8 @@ import { createTemplateProcessor } from './templates'
 // ===============================
 
 export function categoryMetadata(
-  category: { name: string; slug: string; description?: string; businessCount?: number },
+  category: { name: string; slug: string; description?: string; businessCount?: number;   
+  },
   overrides: { title?: string; description?: string } = {}
 ) {
   const siteConfig = getCurrentSite()

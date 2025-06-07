@@ -30,7 +30,7 @@ interface Category {
 // ENTERPRISE: Simplified metadata generation (no site context during build)
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: 'Business Directory - Find Local Businesses & Services',
+    title: 'Duct Cleaning Business Directory - Find Local Businesses & Services',
     description: 'Discover and connect with local businesses in your area.',
     keywords: 'business directory, local services, reviews, business listings',
     openGraph: {
