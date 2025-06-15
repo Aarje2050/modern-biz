@@ -2,6 +2,8 @@
 import SiteAwareLoginForm from '@/components/auth/SiteAwareLoginForm'
 import { getCurrentSite } from '@/lib/site-context'
 import type { Metadata } from 'next'
+import OAuthSessionDebug from '@/components/debug/OAuth-Session-Debug'
+
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteConfig = getCurrentSite() // FIXED: Use getCurrentSite not getCurrentSiteId
@@ -19,5 +21,10 @@ export default function LoginPage() {
   // REMOVED: Server-side redirect logic that was causing issues
   // All sites can have login functionality
   
-  return <SiteAwareLoginForm />
+  return (
+  <>
+  <OAuthSessionDebug />
+  <SiteAwareLoginForm />
+  </>
+  )
 }

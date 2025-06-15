@@ -23,7 +23,7 @@ const nextConfig = {
   },
   // Allow external images from WordPress (UPDATED for temp domain)
   images: {
-    domains: ['krmmxfmvssmzcmbitvil.supabase.co'],
+    domains: ['krmmxfmvssmzcmbitvil.supabase.co','lh3.googleusercontent.com'],
     remotePatterns: [
       {
         protocol: 'https',
