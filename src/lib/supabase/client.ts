@@ -1,4 +1,4 @@
-// src/lib/supabase/client.ts (MINIMAL FIX - KEEP YOUR EXISTING STRUCTURE)
+// src/lib/supabase/client.ts - UPDATED FOR BETTER OAUTH SUPPORT
 import { createBrowserClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -15,7 +15,7 @@ export const createClient = () => {
     return null
   }
 
-  // Create new client with minimal browser configuration
+  // Create new client with enhanced cookie handling for OAuth
   supabaseClient = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -23,32 +23,69 @@ export const createClient = () => {
       cookies: {
         get(name: string) {
           if (typeof document !== 'undefined') {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) {
-              return parts.pop()?.split(';').shift();
+            // Enhanced cookie reading with better parsing
+            const cookies = document.cookie.split(';')
+            for (let cookie of cookies) {
+              const [cookieName, cookieValue] = cookie.trim().split('=')
+              if (cookieName === name) {
+                return decodeURIComponent(cookieValue)
+              }
             }
           }
-          return undefined;
+          return undefined
         },
         set(name: string, value: string, options: any) {
           if (typeof document !== 'undefined') {
-            let cookieString = `${name}=${value}`;
-            if (options?.maxAge) cookieString += `; max-age=${options.maxAge}`;
-            if (options?.path) cookieString += `; path=${options.path}`;
-            if (options?.domain) cookieString += `; domain=${options.domain}`;
-            if (options?.secure) cookieString += `; secure`;
-            if (options?.httpOnly) cookieString += `; httponly`;
-            if (options?.sameSite) cookieString += `; samesite=${options.sameSite}`;
-            document.cookie = cookieString;
+            let cookieString = `${name}=${encodeURIComponent(value)}`
+            
+            // Default options for better OAuth support
+            const defaultOptions = {
+              path: '/',
+              maxAge: 60 * 60 * 24 * 7, // 7 days
+              sameSite: 'lax',
+              secure: window.location.protocol === 'https:'
+            }
+            
+            const finalOptions = { ...defaultOptions, ...options }
+            
+            if (finalOptions.maxAge) cookieString += `; max-age=${finalOptions.maxAge}`
+            if (finalOptions.path) cookieString += `; path=${finalOptions.path}`
+            if (finalOptions.domain) cookieString += `; domain=${finalOptions.domain}`
+            if (finalOptions.secure) cookieString += `; secure`
+            if (finalOptions.httpOnly) cookieString += `; httponly`
+            if (finalOptions.sameSite) cookieString += `; samesite=${finalOptions.sameSite}`
+            
+            document.cookie = cookieString
+            
+            // Enhanced logging for OAuth debugging
+            if (name.includes('auth')) {
+              console.log(`🍪 [CLIENT] Set auth cookie: ${name}`, {
+                hasValue: !!value,
+                length: value.length,
+                secure: finalOptions.secure,
+                sameSite: finalOptions.sameSite
+              })
+            }
           }
         },
         remove(name: string, options: any) {
           if (typeof document !== 'undefined') {
-            let cookieString = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-            if (options?.path) cookieString += `; path=${options.path}`;
-            if (options?.domain) cookieString += `; domain=${options.domain}`;
-            document.cookie = cookieString;
+            const defaultOptions = {
+              path: '/',
+              secure: window.location.protocol === 'https:'
+            }
+            
+            const finalOptions = { ...defaultOptions, ...options }
+            
+            let cookieString = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+            if (finalOptions.path) cookieString += `; path=${finalOptions.path}`
+            if (finalOptions.domain) cookieString += `; domain=${finalOptions.domain}`
+            if (finalOptions.secure) cookieString += `; secure`
+            if (finalOptions.sameSite) cookieString += `; samesite=${finalOptions.sameSite}`
+            
+            document.cookie = cookieString
+            
+            console.log(`🍪 [CLIENT] Removed cookie: ${name}`)
           }
         },
       },
@@ -57,13 +94,32 @@ export const createClient = () => {
         persistSession: true,
         detectSessionInUrl: true,
         flowType: 'pkce',
+        debug: process.env.NODE_ENV === 'development'
       },
-      // Minimal realtime config
       realtime: {
         params: { eventsPerSecond: 10 }
       }
     }
   )
+
+  // Enhanced auth state change logging for OAuth debugging
+  if (process.env.NODE_ENV === 'development' && supabaseClient) {
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      console.log(`🔐 [CLIENT] Auth event: ${event}`, {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        email: session?.user?.email,
+        provider: session?.user?.app_metadata?.provider,
+        cookieCount: document.cookie.split(';').filter(c => c.includes('sb-')).length
+      })
+      
+      // Log cookie details for debugging
+      if (session && event === 'SIGNED_IN') {
+        const authCookies = document.cookie.split(';').filter(c => c.includes('sb-'))
+        console.log(`🍪 [CLIENT] Auth cookies after ${event}:`, authCookies.length)
+      }
+    })
+  }
 
   return supabaseClient
 }
@@ -74,7 +130,7 @@ export const resetClient = () => {
     try {
       supabaseClient.removeAllChannels()
     } catch (error) {
-      // Ignore cleanup errors
+      console.warn('Supabase client cleanup warning:', error)
     }
   }
   supabaseClient = null

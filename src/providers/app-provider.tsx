@@ -1,4 +1,4 @@
-// src/providers/app-provider.tsx - UNIFIED STATE MANAGEMENT
+// src/providers/app-provider.tsx - SAFE VERSION (NO AUTO REDIRECTS)
 'use client'
 
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react'
@@ -81,22 +81,6 @@ export function useApp() {
 // ===============================
 
 const isDev = process.env.NODE_ENV === 'development'
-const LOCALHOST_DOMAINS = ['localhost:3000', 'localhost:3001', '127.0.0.1:3000']
-
-function createDevSiteConfig(domain: string): SiteConfig {
-  return {
-    id: 'localhost-dev',
-    domain,
-    name: 'Development Site',
-    slug: 'dev-site',
-    site_type: 'directory',
-    template: 'modern',
-    config: {},
-    status: 'active',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-}
 
 function log(phase: string, message: string, data?: any) {
   if (isDev) {
@@ -137,7 +121,6 @@ export default function AppProvider({ children }: AppProviderProps) {
   // ===============================
   
   const mountedRef = useRef(true)
-  const initializingRef = useRef(false)
   const supabaseRef = useRef<any>(null)
   
   // ===============================
@@ -150,7 +133,6 @@ export default function AppProvider({ children }: AppProviderProps) {
     
     log('SITE', 'Loading site config for', hostname)
     
-    // Always try database first for ALL domains
     try {
       const response = await fetch('/api/site/current', {
         method: 'GET',
@@ -249,12 +231,6 @@ export default function AppProvider({ children }: AppProviderProps) {
   // ===============================
   
   async function initializeApp() {
-    if (initializingRef.current) {
-      log('INIT', 'Already initializing, skipping...')
-      return
-    }
-
-    initializingRef.current = true
     log('INIT', 'Starting app initialization')
 
     try {
@@ -265,70 +241,22 @@ export default function AppProvider({ children }: AppProviderProps) {
       }
       supabaseRef.current = supabase
 
-      // STEP 2: Get initial session with retry for OAuth
-log('AUTH', 'Getting initial session')
-let session = null
-let sessionError = null
-
-// Try multiple times - OAuth sessions take time to propagate
-for (let attempt = 1; attempt <= 3; attempt++) {
-  const result = await supabase.auth.getSession()
-  session = result.data.session
-  sessionError = result.error
-  
-  log('AUTH', `Session attempt ${attempt}:`, {
-    hasSession: !!session,
-    hasUser: !!session?.user,
-    email: session?.user?.email
-  })
-  
-  if (session?.user) {
-    log('AUTH', 'Session found on attempt', attempt)
-    break
-  }
-  
-  if (attempt < 3) {
-    log('AUTH', 'No session, waiting 500ms before retry...')
-    await new Promise(resolve => setTimeout(resolve, 500))
-  }
-}
-// After the session retry loop, add this:
-if (!session && window.location.search.includes('auth_success')) {
-  log('AUTH', 'OAuth success detected but no session - forcing session refresh')
-  
-  try {
-    // Force refresh session to pick up cookies
-    const { data: refreshResult, error: refreshError } = await supabase.auth.refreshSession()
-    
-    if (refreshResult.session) {
-      log('AUTH', 'Session refresh successful after OAuth')
-      session = refreshResult.session
-    } else {
-      log('AUTH', 'Session refresh failed after OAuth', refreshError)
-      
-      // Nuclear option - force page reload to pick up cookies
-      log('AUTH', 'Forcing page reload to sync cookies')
-      window.location.href = window.location.pathname
-      return
-    }
-  } catch (err) {
-    log('AUTH', 'Session refresh error, forcing page reload', err)
-    window.location.href = window.location.pathname
-    return
-  }
-}
-
-      // ADD THIS DEBUG:
-  console.log('🔍 APP PROVIDER DEBUG:', {
-    hasSession: !!session,
-    hasUser: !!session?.user,
-    userEmail: session?.user?.email,
-    cookiesInBrowser: document.cookie.split(';').filter(c => c.includes('sb-')).length
-  })
+      // STEP 2: Get session (simple, clean)
+      log('AUTH', 'Getting session')
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
       
       if (sessionError) {
         log('AUTH', 'Session error', sessionError)
       }
+      
+      const session = sessionData.session
+      const user = session?.user || null
+
+      log('AUTH', 'Session result', {
+        hasSession: !!session,
+        hasUser: !!user,
+        email: user?.email
+      })
 
       if (!mountedRef.current) return
 
@@ -336,11 +264,11 @@ if (!session && window.location.search.includes('auth_success')) {
       setState(prev => ({
         ...prev,
         session,
-        user: session?.user || null,
+        user,
         authLoading: false
       }))
 
-      // STEP 3: Load site config (always, regardless of auth)
+      // STEP 3: Load site config
       log('SITE', 'Loading site configuration')
       const siteConfig = await loadSiteConfig()
 
@@ -354,9 +282,9 @@ if (!session && window.location.search.includes('auth_success')) {
 
       // STEP 4: Load permissions (only if authenticated)
       let permissions = null
-      if (session?.user) {
+      if (user) {
         log('PERMISSIONS', 'User authenticated - loading permissions')
-        permissions = await loadPermissions(session.user, siteConfig)
+        permissions = await loadPermissions(user, siteConfig)
       } else {
         log('PERMISSIONS', 'No user - skipping permissions')
       }
@@ -387,8 +315,6 @@ if (!session && window.location.search.includes('auth_success')) {
           error: 'Failed to initialize app'
         }))
       }
-    } finally {
-      initializingRef.current = false
     }
   }
 
@@ -585,7 +511,6 @@ export function useUnifiedAuth() {
   }
 }
 
-// MISSING HOOK: Dashboard access
 export function useDashboardAccess() {
   const { canAccessDashboard, loading, isAuthenticated } = useUnifiedAuth()
   

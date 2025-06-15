@@ -1,4 +1,4 @@
-// src/components/auth/DashboardAccessGuard.tsx - FIXED IMPORTS
+// src/components/auth/DashboardAccessGuard.tsx - DEBUG VERSION
 'use client'
 
 import { useRouter } from 'next/navigation'
@@ -12,8 +12,7 @@ interface DashboardAccessGuardProps {
 }
 
 /**
- * ENTERPRISE: Dashboard access guard
- * Use this to wrap dashboard pages/components
+ * ENTERPRISE: Dashboard access guard with enhanced debugging
  */
 export function DashboardAccessGuard({ 
   children, 
@@ -22,10 +21,31 @@ export function DashboardAccessGuard({
 }: DashboardAccessGuardProps) {
   const router = useRouter()
   const { canAccess, loading, shouldRedirectToLogin, shouldShowAccessDenied } = useDashboardAccess()
+  const { user, permissions, isAuthenticated } = useUnifiedAuth()
+
+  // Enhanced logging for debugging
+  useEffect(() => {
+    console.log('🛡️ [DASHBOARD-GUARD] State:', {
+      loading,
+      isAuthenticated,
+      hasUser: !!user,
+      userEmail: user?.email,
+      canAccess,
+      shouldRedirectToLogin,
+      shouldShowAccessDenied,
+      permissions: permissions ? {
+        canAccessDashboard: permissions.canAccessDashboard,
+        isBusinessOwner: permissions.isBusinessOwner,
+        isGlobalAdmin: permissions.isGlobalAdmin,
+        isSiteAdmin: permissions.isSiteAdmin
+      } : null
+    })
+  }, [loading, isAuthenticated, user, canAccess, shouldRedirectToLogin, shouldShowAccessDenied, permissions])
 
   // Redirect to login if not authenticated
   useEffect(() => {
     if (shouldRedirectToLogin && redirectToLogin) {
+      console.log('🛡️ [DASHBOARD-GUARD] Redirecting to login - not authenticated')
       const currentPath = window.location.pathname
       router.push(`/login?redirect_to=${encodeURIComponent(currentPath)}`)
     }
@@ -33,6 +53,7 @@ export function DashboardAccessGuard({
 
   // Show loading state
   if (loading) {
+    console.log('🛡️ [DASHBOARD-GUARD] Showing loading state')
     return (
       <div className="flex items-center justify-center min-h-[200px]">
         <div className="text-center">
@@ -45,6 +66,7 @@ export function DashboardAccessGuard({
 
   // Show access denied
   if (shouldShowAccessDenied) {
+    console.log('🛡️ [DASHBOARD-GUARD] Showing access denied')
     return fallback || (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center max-w-md">
@@ -57,6 +79,9 @@ export function DashboardAccessGuard({
           <p className="mt-1 text-sm text-gray-500">
             You don't have permission to access the dashboard. Please contact support if you believe this is an error.
           </p>
+          
+          
+          
           <div className="mt-6">
             <button
               onClick={() => router.push('/')}
@@ -72,11 +97,25 @@ export function DashboardAccessGuard({
 
   // Allow access
   if (canAccess) {
+    console.log('🛡️ [DASHBOARD-GUARD] Access granted - rendering dashboard')
     return <>{children}</>
   }
 
   // Fallback (shouldn't reach here)
-  return null
+  console.log('🛡️ [DASHBOARD-GUARD] Unexpected state - no access decision made')
+  return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="text-center">
+        <p className="text-gray-600">Unexpected authentication state. Please refresh the page.</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-2 text-blue-600 hover:text-blue-500 underline"
+        >
+          Refresh Page
+        </button>
+      </div>
+    </div>
+  )
 }
 
 /**
