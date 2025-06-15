@@ -24,24 +24,41 @@ export default function OAuthSessionDebug() {
       code: searchParams.get('code'),
       error: searchParams.get('error'),
       error_description: searchParams.get('error_description'),
+      message: searchParams.get('message'),
       state: searchParams.get('state'),
-      redirect_to: searchParams.get('redirect_to')
+      redirect_to: searchParams.get('redirect_to'),
+      auth_success: searchParams.get('auth_success'),
+      auth_provider: searchParams.get('auth_provider'),
+      auth_time: searchParams.get('auth_time')
     }
 
     if (params.code) {
       addLog(`OAuth code received: ${params.code.substring(0, 10)}...`)
     }
     if (params.error) {
-      addLog(`OAuth error: ${params.error} - ${params.error_description}`)
+      addLog(`❌ OAuth error: ${params.error}`)
+      if (params.message) {
+        addLog(`❌ Error details: ${params.message}`)
+      }
+      if (params.error_description) {
+        addLog(`❌ Error description: ${params.error_description}`)
+      }
+    }
+    if (params.auth_success) {
+      addLog(`✅ OAuth success detected (provider: ${params.auth_provider})`)
+      if (params.auth_time) {
+        const authTime = new Date(parseInt(params.auth_time))
+        addLog(`✅ Auth completed at: ${authTime.toLocaleTimeString()}`)
+      }
     }
     if (params.redirect_to) {
       addLog(`Redirect target: ${params.redirect_to}`)
     }
 
     // Auto-show debugger if we have OAuth parameters
-    if (params.code || params.error) {
+    if (params.code || params.error || params.auth_success) {
       setIsVisible(true)
-      addLog('OAuth callback detected - showing debugger')
+      addLog('OAuth activity detected - showing debugger')
     }
   }, [searchParams])
 
