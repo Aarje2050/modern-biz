@@ -79,14 +79,25 @@ export async function GET(request: NextRequest) {
                            sessionData.user.email?.split('@')[0] || 
                            'User'
 
-        // FIXED: Use correct profile schema (no email column)
+        
+        // First, check if user already exists
+const { data: existingProfile } = await supabase
+.from('profiles')
+.select('account_type')
+.eq('id', sessionData.user.id)
+.single()
+
+// Use existing account_type or default to 'standard' for new users
+const accountType = existingProfile?.account_type || 'standard'
+
+                           // FIXED: Use correct profile schema (no email column)
         const { error: profileError } = await supabase
           .from('profiles')
           .upsert({
             id: sessionData.user.id,
             full_name: displayName,
             avatar_url: sessionData.user.user_metadata?.avatar_url || null,
-            account_type: 'standard',
+            account_type: accountType, // Preserve existing or set default
             metadata: {
               oauth_provider: sessionData.user.app_metadata?.provider,
               created_via: 'oauth',

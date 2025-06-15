@@ -117,13 +117,6 @@ function DashboardContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
-        {/* Debug Info (remove in production) */}
-        <div className="mb-4 p-2 bg-blue-50 rounded text-xs">
-          <strong>Debug:</strong> Admin: {isAdmin ? 'Yes' : 'No'} | 
-          Business Owner: {isBusinessOwner ? 'Yes' : 'No'} | 
-          Businesses: {permissions?.ownedBusinesses?.length || 0}
-        </div>
-        
         {renderDashboard()}
       </div>
     </div>
