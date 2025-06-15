@@ -1,10 +1,11 @@
-// src/components/auth/SiteAwareLoginForm.tsx - FIXED OAUTH SESSION HANDLING
+// src/components/auth/SiteAwareLoginForm.tsx - WITH DIRECT GOOGLE OAUTH
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth, useSiteContext, useUnifiedAuth } from '@/providers/app-provider'
 import { createClient } from '@/lib/supabase/client'
+import { directGoogleOAuth } from '@/lib/auth/direct-google-oauth'
 
 export default function SiteAwareLoginForm() {
   const router = useRouter()
@@ -17,104 +18,80 @@ export default function SiteAwareLoginForm() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
-  const [debugInfo, setDebugInfo] = useState<string[]>([])
 
   const redirectTo = searchParams.get('redirect_to') || '/dashboard'
-  const authRefresh = searchParams.get('auth_refresh')
-  const authProvider = searchParams.get('auth_provider')
-  const oauthError = searchParams.get('error')
+  const googleAuthSuccess = searchParams.get('google_auth_success')
+  const authError = searchParams.get('error')
+  const authMessage = searchParams.get('message')
   
   // Refs to prevent multiple redirects
   const redirectedRef = useRef(false)
-  const sessionCheckRef = useRef(false)
 
-  // Add debug info
-  const addDebug = (message: string) => {
-    console.log(`🔍 Login Debug: ${message}`)
-    setDebugInfo(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${message}`])
-  }
-
-  // Handle OAuth errors from callback
+  // Handle Google auth success
   useEffect(() => {
-    if (oauthError) {
-      addDebug(`OAuth error detected: ${oauthError}`)
-      const errorMessages = {
-        oauth_exchange_failed: 'Google sign-in failed. Please try again.',
-        user_not_found: 'Account creation failed. Please try again.',
-        oauth_callback_error: 'Authentication error occurred. Please try again.',
-        no_authorization_code: 'Google authorization was incomplete. Please try again.'
+    if (googleAuthSuccess) {
+      console.log('🔐 Direct Google OAuth success detected')
+      
+      // Clean up URL
+      const cleanUrl = new URL(window.location.href)
+      cleanUrl.searchParams.delete('google_auth_success')
+      cleanUrl.searchParams.delete('email')
+      cleanUrl.searchParams.delete('redirect_to')
+      
+      // Force page refresh to get new session
+      setTimeout(() => {
+        window.location.href = redirectTo
+      }, 1000)
+      
+      return
+    }
+  }, [googleAuthSuccess, redirectTo])
+
+  // Handle auth errors
+  useEffect(() => {
+    if (authError) {
+      const errorMessages: Record<string, string> = {
+        'google_oauth_error': 'Google authorization was cancelled or failed.',
+        'invalid_oauth_response': 'Invalid response from Google. Please try again.',
+        'google_auth_failed': authMessage || 'Google authentication failed. Please try again.',
+        'token_exchange_failed': 'Failed to exchange authorization code. Please try again.',
+        'user_creation_failed': 'Failed to create user account. Please try again.'
       }
-      setError(errorMessages[oauthError as keyof typeof errorMessages] || 'Authentication failed. Please try again.')
+      
+      setError(errorMessages[authError] || authMessage || 'Authentication failed. Please try again.')
       
       // Clean up URL
       const cleanUrl = new URL(window.location.href)
       cleanUrl.searchParams.delete('error')
-      cleanUrl.searchParams.delete('details')
+      cleanUrl.searchParams.delete('message')
       window.history.replaceState({}, '', cleanUrl.toString())
     }
-  }, [oauthError])
+  }, [authError, authMessage])
 
-  // Enhanced session refresh after OAuth
+  // Main redirect logic for regular auth
   useEffect(() => {
-    if (authRefresh && !sessionCheckRef.current) {
-      sessionCheckRef.current = true
-      addDebug(`OAuth session refresh triggered (provider: ${authProvider})`)
-      
-      const refreshSession = async () => {
-        try {
-          const supabase = createClient()
-          if (!supabase) return
-          
-          addDebug('Refreshing session after OAuth...')
-          
-          // Force session refresh
-          const { data: { session }, error } = await supabase.auth.getSession()
-          
-          if (error) {
-            addDebug(`Session refresh error: ${error.message}`)
-            setError('Session verification failed. Please try signing in again.')
-            return
-          }
-          
-          if (session?.user) {
-            addDebug(`Session refreshed successfully for user: ${session.user.email}`)
-            // Clean up URL and redirect
-            const cleanUrl = new URL(window.location.href)
-            cleanUrl.searchParams.delete('auth_refresh')
-            cleanUrl.searchParams.delete('auth_provider')
-            
-            setTimeout(() => {
-              window.location.href = cleanUrl.pathname === '/login' ? redirectTo : cleanUrl.pathname
-            }, 500)
-          } else {
-            addDebug('No session found after refresh')
-            setError('Authentication session not found. Please try signing in again.')
-          }
-        } catch (err) {
-          addDebug(`Session refresh failed: ${err}`)
-          setError('Authentication verification failed. Please try again.')
-        }
-      }
-      
-      refreshSession()
-    }
-  }, [authRefresh, authProvider, redirectTo])
-
-  // Main redirect logic - enhanced with better checks
-  useEffect(() => {
-    if (user && !authLoading && !loading && !googleLoading && !redirectedRef.current) {
-      addDebug(`User authenticated, preparing redirect to: ${redirectTo}`)
+    if (user && !authLoading && !loading && !googleLoading && !redirectedRef.current && !googleAuthSuccess) {
+      console.log('🔄 Login: User authenticated, redirecting to:', redirectTo)
       redirectedRef.current = true
       
-      // Clean redirect - remove auth parameters
-      const cleanRedirectUrl = redirectTo.split('?')[0]
-      
       setTimeout(() => {
-        addDebug(`Redirecting to: ${cleanRedirectUrl}`)
-        window.location.href = cleanRedirectUrl
+        window.location.href = redirectTo
       }, 100)
     }
-  }, [user, authLoading, loading, googleLoading, redirectTo])
+  }, [user, authLoading, loading, googleLoading, redirectTo, googleAuthSuccess])
+
+  // Show loading for Google auth success
+  if (googleAuthSuccess) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600">Google authentication successful!</p>
+          <p className="mt-1 text-xs text-gray-500">Redirecting to your dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   // Show loading if already authenticated
   if (user && !authLoading) {
@@ -123,66 +100,24 @@ export default function SiteAwareLoginForm() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto"></div>
           <p className="mt-2 text-sm text-gray-600">Redirecting to your dashboard...</p>
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-4 text-xs text-gray-400 max-w-md">
-              <p>Debug info:</p>
-              {debugInfo.map((info, i) => (
-                <p key={i}>{info}</p>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     )
   }
 
-  // Enhanced Google Sign-In handler
+  // UPDATED: Direct Google Sign-In handler (shows YOUR domain)
   const handleGoogleSignIn = async () => {
     if (googleLoading) return // Prevent double-clicks
     
     setGoogleLoading(true)
     setError('')
-    addDebug('Starting Google OAuth flow')
 
     try {
-      const supabase = createClient()
-      if (!supabase) {
-        throw new Error('Unable to connect to authentication service')
-      }
-
-      // Build the redirect URL that preserves site context
-      const baseUrl = window.location.origin
-      const callbackUrl = `${baseUrl}/api/auth/callback`
-      
-      // Add redirect_to parameter to the callback URL
-      const redirectUrl = new URL(callbackUrl)
-      if (redirectTo && redirectTo !== '/dashboard') {
-        redirectUrl.searchParams.set('redirect_to', redirectTo)
-      }
-
-      addDebug(`OAuth redirect URL: ${redirectUrl.toString()}`)
-
-      const { data, error: authError } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl.toString(),
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          }
-        }
-      })
-
-      if (authError) {
-        addDebug(`Google OAuth error: ${authError.message}`)
-        throw authError
-      }
-
-      addDebug('Google OAuth initiated successfully - redirecting...')
-      // OAuth flow will redirect automatically, no need to handle response here
-
+      console.log('🔐 Starting DIRECT Google OAuth (will show your domain)')
+      await directGoogleOAuth.signIn()
+      // Will redirect automatically to Google
     } catch (err: any) {
-      addDebug(`Google OAuth failed: ${err.message}`)
+      console.error('❌ Direct Google OAuth failed:', err)
       setError(err.message || 'Google sign-in failed. Please try again.')
       setGoogleLoading(false)
     }
@@ -193,7 +128,6 @@ export default function SiteAwareLoginForm() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    addDebug(`Starting email login for: ${email}`)
 
     try {
       const supabase = createClient()
@@ -201,13 +135,15 @@ export default function SiteAwareLoginForm() {
         throw new Error('Unable to connect to authentication service')
       }
 
+      console.log('🔐 Email Login: Attempting login for:', email)
+
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       })
 
       if (authError) {
-        addDebug(`Email login error: ${authError.message}`)
+        console.error('❌ Email Login error:', authError)
         if (authError.message.includes('Invalid login credentials')) {
           setError('Invalid email or password. Please try again.')
         } else if (authError.message.includes('Email not confirmed')) {
@@ -219,13 +155,13 @@ export default function SiteAwareLoginForm() {
       }
 
       if (data.session && data.user) {
-        addDebug(`Email login successful for: ${data.user.email}`)
+        console.log('✅ Email Login successful, user:', data.user.email)
         // Don't redirect here - let useEffect handle it
       } else {
         setError('Login failed - please try again')
       }
     } catch (err: any) {
-      addDebug(`Email login failed: ${err.message}`)
+      console.error('❌ Email Login error:', err)
       setError(err.message || 'An unexpected error occurred. Please try again.')
     } finally {
       setLoading(false)
@@ -238,7 +174,7 @@ export default function SiteAwareLoginForm() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-600">Loading authentication...</p>
+          <p className="mt-2 text-sm text-gray-600">Loading...</p>
         </div>
       </div>
     )
@@ -290,17 +226,7 @@ export default function SiteAwareLoginForm() {
             </div>
           )}
 
-          {/* DEBUG INFO (Development Only) */}
-          {process.env.NODE_ENV === 'development' && debugInfo.length > 0 && (
-            <div className="mb-4 bg-blue-50 border-l-4 border-blue-400 p-3 rounded">
-              <p className="text-xs font-medium text-blue-800 mb-1">Debug Info:</p>
-              {debugInfo.map((info, i) => (
-                <p key={i} className="text-xs text-blue-700">{info}</p>
-              ))}
-            </div>
-          )}
-
-          {/* GOOGLE SIGN-IN BUTTON (Primary) */}
+          {/* DIRECT GOOGLE SIGN-IN BUTTON (Shows YOUR domain) */}
           <div className="mb-6">
             <button
               type="button"
@@ -327,8 +253,8 @@ export default function SiteAwareLoginForm() {
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                   </svg>
                   Continue with Google
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                    Recommended
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    Shows Your Domain
                   </span>
                 </>
               )}
