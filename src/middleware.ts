@@ -98,12 +98,12 @@ function hasValidAuthCookie(request: NextRequest): boolean {
   try {
     const cookies = request.cookies.getAll()
     
-    // Look for Supabase auth cookie
+    // Look for Supabase auth cookie (including chunked cookies .0, .1, etc)
     const authCookie = cookies.find(cookie => 
       cookie.name.startsWith('sb-') && 
-      cookie.name.endsWith('-auth-token') &&
+      (cookie.name.includes('-auth-token')) &&  // Changed this line
       cookie.value && 
-      cookie.value.length > 50 // Basic length check
+      cookie.value.length > 50
     )
     
     return !!authCookie

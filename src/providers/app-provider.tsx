@@ -265,9 +265,66 @@ export default function AppProvider({ children }: AppProviderProps) {
       }
       supabaseRef.current = supabase
 
-      // STEP 2: Get initial session
-      log('AUTH', 'Getting initial session')
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      // STEP 2: Get initial session with retry for OAuth
+log('AUTH', 'Getting initial session')
+let session = null
+let sessionError = null
+
+// Try multiple times - OAuth sessions take time to propagate
+for (let attempt = 1; attempt <= 3; attempt++) {
+  const result = await supabase.auth.getSession()
+  session = result.data.session
+  sessionError = result.error
+  
+  log('AUTH', `Session attempt ${attempt}:`, {
+    hasSession: !!session,
+    hasUser: !!session?.user,
+    email: session?.user?.email
+  })
+  
+  if (session?.user) {
+    log('AUTH', 'Session found on attempt', attempt)
+    break
+  }
+  
+  if (attempt < 3) {
+    log('AUTH', 'No session, waiting 500ms before retry...')
+    await new Promise(resolve => setTimeout(resolve, 500))
+  }
+}
+// After the session retry loop, add this:
+if (!session && window.location.search.includes('auth_success')) {
+  log('AUTH', 'OAuth success detected but no session - forcing session refresh')
+  
+  try {
+    // Force refresh session to pick up cookies
+    const { data: refreshResult, error: refreshError } = await supabase.auth.refreshSession()
+    
+    if (refreshResult.session) {
+      log('AUTH', 'Session refresh successful after OAuth')
+      session = refreshResult.session
+    } else {
+      log('AUTH', 'Session refresh failed after OAuth', refreshError)
+      
+      // Nuclear option - force page reload to pick up cookies
+      log('AUTH', 'Forcing page reload to sync cookies')
+      window.location.href = window.location.pathname
+      return
+    }
+  } catch (err) {
+    log('AUTH', 'Session refresh error, forcing page reload', err)
+    window.location.href = window.location.pathname
+    return
+  }
+}
+
+      // ADD THIS DEBUG:
+  console.log('🔍 APP PROVIDER DEBUG:', {
+    hasSession: !!session,
+    hasUser: !!session?.user,
+    userEmail: session?.user?.email,
+    cookiesInBrowser: document.cookie.split(';').filter(c => c.includes('sb-')).length
+  })
       
       if (sessionError) {
         log('AUTH', 'Session error', sessionError)

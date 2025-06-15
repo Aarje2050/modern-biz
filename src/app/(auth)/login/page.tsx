@@ -2,7 +2,6 @@
 import SiteAwareLoginForm from '@/components/auth/SiteAwareLoginForm'
 import { getCurrentSite } from '@/lib/site-context'
 import type { Metadata } from 'next'
-import OAuthSessionDebug from '@/components/debug/OAuth-Session-Debug'
 
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -23,7 +22,7 @@ export default function LoginPage() {
   
   return (
   <>
-  <OAuthSessionDebug />
+  
   <SiteAwareLoginForm />
   </>
   )
